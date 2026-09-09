@@ -21,6 +21,8 @@ var grounded: bool = false
 var contact_point: Vector3 = Vector3.ZERO
 var slip_ratio: float = 0.0
 var slip_angle: float = 0.0
+## Grip multiplier of whatever the wheel is currently standing on.
+var surface_friction: float = 1.0
 var longitudinal_force: float = 0.0
 var lateral_force: float = 0.0
 
@@ -80,5 +82,6 @@ func reset() -> void:
 	grounded = false
 	slip_ratio = 0.0
 	slip_angle = 0.0
+	surface_friction = 1.0
 	longitudinal_force = 0.0
 	lateral_force = 0.0

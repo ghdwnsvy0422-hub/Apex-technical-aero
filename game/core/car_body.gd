@@ -211,6 +211,7 @@ func _simulate_wheel(
 
 	wheel.grounded = true
 	wheel.contact_point = hit["position"]
+	wheel.surface_friction = _surface_friction(hit)
 
 	var suspension_length := mount.distance_to(wheel.contact_point) - setup.wheel_radius
 	wheel.compression = clampf(
@@ -237,7 +238,9 @@ func _simulate_wheel(
 	wheel.slip_angle = TyreModel.slip_angle(lateral_speed, longitudinal_speed)
 
 	var coefficients := TyreModel.combined_coefficients(wheel.slip_ratio, wheel.slip_angle)
-	var limit := TyreModel.grip_limit(load, setup.tyre_friction, setup.load_sensitivity)
+	var limit := TyreModel.grip_limit(
+		load, setup.tyre_friction * wheel.surface_friction, setup.load_sensitivity
+	)
 	wheel.longitudinal_force = coefficients.x * limit
 	wheel.lateral_force = coefficients.y * limit
 
@@ -267,6 +270,15 @@ func _apply_aero() -> void:
 	var rear_point := global_transform * Vector3(0.0, 0.0, setup.rear_axle_z())
 	apply_force(down * setup.aero_balance, front_point - global_position)
 	apply_force(down * (1.0 - setup.aero_balance), rear_point - global_position)
+
+
+## Surfaces advertise their own grip through metadata, so running wide onto
+## the runoff costs time without the physics knowing what a track is.
+func _surface_friction(hit: Dictionary) -> float:
+	var collider: Object = hit.get("collider")
+	if collider == null or not collider.has_meta(&"surface_friction"):
+		return 1.0
+	return float(collider.get_meta(&"surface_friction"))
 
 
 func _velocity_at(point: Vector3) -> Vector3:

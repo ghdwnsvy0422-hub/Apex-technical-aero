@@ -31,7 +31,7 @@ func _start_client() -> void:
 		return
 	var capture: Node = preload("res://client/screen_capture.gd").new()
 	capture.output_path = str(GameConfig.args["capture"])
-	capture.delay_frames = int(GameConfig.args.get("capture-frames", 240))
+	capture.delay_seconds = float(GameConfig.args.get("capture-after", 20.0))
 	add_child(capture)
 
 

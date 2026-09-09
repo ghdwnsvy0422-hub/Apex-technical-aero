@@ -1,18 +1,26 @@
 extends Node
-## Saves a screenshot after a fixed number of frames, then quits.
+## Saves a screenshot once the simulation has run for a given time, then quits.
 ##
 ## Vibe coding has nobody watching the window, so this is how a visual change is
-## actually verified rather than assumed. Frames are counted rather than
-## seconds waited so a slow software renderer still produces the same shot.
+## actually verified rather than assumed. The wait is measured in simulation
+## time, not frames: software rendering is slow enough that Godot caps how many
+## physics steps it runs per frame, so a frame count would capture a car that
+## has barely moved.
 
 const TAG: String = "Capture"
 
 var output_path: String = "capture.png"
-var delay_frames: int = 240
+var delay_seconds: float = 20.0
+
+var _elapsed: float = 0.0
+
+
+func _physics_process(delta: float) -> void:
+	_elapsed += delta
 
 
 func _ready() -> void:
-	for _frame: int in delay_frames:
+	while _elapsed < delay_seconds:
 		await get_tree().process_frame
 
 	# The viewport texture only holds this frame's image once drawing is done.

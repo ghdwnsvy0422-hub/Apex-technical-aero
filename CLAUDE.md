@@ -44,8 +44,11 @@ Godot 바이너리는 리포에 포함하지 않는다. `bin/`은 gitignore되�
 디스플레이가 없는 환경에서도 화면을 PNG로 뽑을 수 있다. Forward+는 Vulkan을 요구하므로 Xvfb + OpenGL 렌더러를 쓴다.
 
 ```bash
-./tools/screenshot.sh /tmp/shot.png 260   # 260프레임 뒤 캡처
+./tools/screenshot.sh /tmp/shot.png 26        # 시뮬 26초 시점의 추격 시점
+./tools/screenshot.sh /tmp/top.png 26 top     # 같은 시점의 하향 시점
 ```
+
+대기 시간은 프레임이 아니라 **시뮬레이션 시간**이고, 캡처는 `--fixed-fps`로 돈다. 소프트웨어 래스터라이저는 느려서 프레임 기준으로 기다리면 Godot이 프레임당 물리 스텝 수를 제한(`max_physics_steps_per_frame`)해 버리고, 결과적으로 **출발선에 그대로 서 있는 차**를 찍는다. 실제로 이 함정에 두 번 빠졌다.
 
 **시각적 변경은 반드시 캡처해서 눈으로 확인한다.** 차의 앞뒤가 뒤집힌 채로 물리 프로브를 전부 통과한 적이 있다 — 회두각의 크기만 봤기 때문이다. 스크린샷 한 장이 그걸 즉시 드러냈다.
 

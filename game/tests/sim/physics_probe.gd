@@ -22,6 +22,7 @@ func _ready() -> void:
 	await _probe_braking()
 	await _probe_cornering()
 	await _probe_downforce_tradeoff()
+	await _probe_track_surfaces()
 	_report()
 
 
@@ -181,6 +182,67 @@ func _top_speed_with_downforce(downforce_area: float) -> float:
 
 	_despawn(harness)
 	return speed
+
+
+## The generated track must present the surfaces the profile describes, and
+## those surfaces must actually reach the tyre. A track that looks right but
+## reports road grip everywhere would quietly delete the cost of running wide.
+func _probe_track_surfaces() -> void:
+	var track := Track.new()
+	track.curve = CurveBuilder.oval(600.0, 200.0, 6.0)
+	add_child(track)
+	track.build()
+
+	var frame := track.frame_at_distance(0.0)
+	var profile := track.profile
+	_check(_surface_at(frame, 0.0) == "road", "centreline is road")
+	_check(
+		_surface_at(frame, profile.road_half_width + profile.kerb_width * 0.5) == "kerb",
+		"the road edge is kerbed"
+	)
+	_check(
+		_surface_at(frame, profile.kerb_edge() + profile.runoff_width * 0.5) == "runoff",
+		"beyond the kerb is runoff"
+	)
+	_check(_surface_at(frame, profile.runoff_edge() + 4.0) == "", "the track ends at the barrier")
+
+	var car := CarBody.new()
+	var ride_height := car.setup.contact_depth() + 0.10
+	car.transform = track.start_transform(ride_height)
+	add_child(car)
+	await _settle(car)
+	var on_road := car.wheels[0].surface_friction
+
+	var off := track.start_transform(ride_height)
+	off.origin += off.basis.x * (profile.kerb_edge() + profile.runoff_width * 0.5)
+	car.teleport_to(off)
+	await _settle(car)
+	var on_runoff := car.wheels[0].surface_friction
+
+	Log.info(TAG, "surface grip: road %.2f | runoff %.2f" % [on_road, on_runoff])
+	_check(is_equal_approx(on_road, 1.0), "tyres see full grip on the road")
+	_check(on_runoff < on_road, "tyres lose grip on the runoff")
+
+	remove_child(car)
+	car.queue_free()
+	remove_child(track)
+	track.queue_free()
+
+
+func _settle(car: CarBody) -> void:
+	car.input = DriverInput.new()
+	for _tick: int in TICK_RATE:
+		await get_tree().physics_frame
+
+
+func _surface_at(frame: Transform3D, lateral: float) -> String:
+	var from := frame.origin + frame.basis.x * lateral + Vector3.UP * 6.0
+	var query := PhysicsRayQueryParameters3D.create(from, from - Vector3.UP * 14.0)
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return ""
+	var collider: Object = hit["collider"]
+	return str(collider.get_meta(Track.SURFACE_NAME_META, ""))
 
 
 func _heading(car: CarBody) -> float:
