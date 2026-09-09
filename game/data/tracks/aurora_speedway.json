@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "_comment": "Track source format (PRODUCTION_PLAN part B-1). Segments are traversed in order from the start line; the compiler in Phase 1.4 turns them into a Curve3D, road mesh, collision, racing line, and sector splits. Corner angle is degrees turned, positive = right. Geometry here is a first draft and is not yet closure-verified.",
+  "_comment": "Track source format (PRODUCTION_PLAN part B-1). Segments are traversed in order from the start line; the compiler in Phase 1.4 turns them into a Curve3D, road mesh, collision, racing line, and sector splits. Corner angle is degrees turned, positive = right. Corner angles must total 360 degrees or the centreline does not close; DataRegistry checks that at boot.",
   "id": "aurora_speedway",
   "name": "Aurora Speedway",
   "type": "high_speed",

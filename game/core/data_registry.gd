@@ -10,6 +10,21 @@ const SCHEMA_VERSION: int = 1
 const PARTS_PATH := "res://data/parts.json"
 const TIERS_PATH := "res://data/tiers.json"
 const COMPOUNDS_PATH := "res://data/tyre_compounds.json"
+const TRACKS_DIR := "res://data/tracks"
+
+const TRACK_TYPES: Array[String] = [
+	"high_speed",
+	"street",
+	"technical",
+	"elevation",
+	"mixed",
+]
+
+const MIN_TRACK_SEGMENTS: int = 3
+const MAX_CORNER_ANGLE_DEG: float = 180.0
+const MAX_BANKING_DEG: float = 15.0
+const FULL_TURN_DEG: float = 360.0
+const TRACK_CLOSURE_TOLERANCE_DEG: float = 5.0
 
 const _TAG := "Data"
 
@@ -19,6 +34,8 @@ var parts: Dictionary = {}
 var tiers: Array = []
 ## Compound id -> compound definition.
 var compounds: Dictionary = {}
+## Track id -> track definition.
+var tracks: Dictionary = {}
 
 var load_errors: PackedStringArray = []
 
@@ -26,8 +43,8 @@ var load_errors: PackedStringArray = []
 func _ready() -> void:
 	load_errors = reload()
 	if load_errors.is_empty():
-		Log.info(_TAG, "Loaded %d parts, %d tiers, %d compounds" % [
-			parts.size(), tiers.size(), compounds.size()
+		Log.info(_TAG, "Loaded %d parts, %d tiers, %d compounds, %d tracks" % [
+			parts.size(), tiers.size(), compounds.size(), tracks.size()
 		])
 		return
 	for message: String in load_errors:
@@ -54,6 +71,20 @@ func reload() -> PackedStringArray:
 	if compound_errors.is_empty():
 		compounds = index_by_id((compound_data as Dictionary)["compounds"])
 
+	tracks = {}
+	for path: String in track_paths():
+		var track_data: Variant = read_json(path)
+		var track_errors := _prefix(path, validate_track(track_data))
+		if not track_errors.is_empty():
+			errors.append_array(track_errors)
+			continue
+		var track := track_data as Dictionary
+		var track_id := str(track["id"])
+		if tracks.has(track_id):
+			errors.append("%s: duplicate track id '%s'" % [path.get_file(), track_id])
+			continue
+		tracks[track_id] = track
+
 	return errors
 
 
@@ -73,8 +104,22 @@ func get_compound(id: String) -> Dictionary:
 	return compounds.get(id, {})
 
 
+func get_track(id: String) -> Dictionary:
+	return tracks.get(id, {})
+
+
 func tier_for_elo(elo: int) -> Dictionary:
 	return resolve_tier(elo, tiers)
+
+
+static func track_paths() -> PackedStringArray:
+	var paths: PackedStringArray = []
+	for file_name: String in DirAccess.get_files_at(TRACKS_DIR):
+		var source := file_name.trim_suffix(".remap")
+		if source.ends_with(".json"):
+			paths.append("%s/%s" % [TRACKS_DIR, source])
+	paths.sort()
+	return paths
 
 
 static func read_json(path: String) -> Variant:
@@ -201,6 +246,137 @@ static func validate_compounds(data: Variant) -> PackedStringArray:
 				errors.append("compound '%s' is missing '%s'" % [id, field])
 			elif float(compound[field]) <= 0.0:
 				errors.append("compound '%s' has non-positive %s" % [id, field])
+
+	return errors
+
+
+static func validate_track(data: Variant) -> PackedStringArray:
+	var errors: PackedStringArray = []
+	if typeof(data) != TYPE_DICTIONARY:
+		errors.append("file is missing or is not a JSON object")
+		return errors
+
+	var track := data as Dictionary
+	if int(track.get("schema_version", -1)) != SCHEMA_VERSION:
+		errors.append("schema_version must be %d" % SCHEMA_VERSION)
+	if str(track.get("id", "")).is_empty():
+		errors.append("track is missing 'id'")
+	if str(track.get("name", "")).is_empty():
+		errors.append("track is missing 'name'")
+	if not TRACK_TYPES.has(str(track.get("type", ""))):
+		errors.append("unknown track type '%s'" % track.get("type", ""))
+	if float(track.get("width_m", 0.0)) <= 0.0:
+		errors.append("width_m must be positive")
+	if int(track.get("race_laps", 0)) < 1:
+		errors.append("race_laps must be at least 1")
+	if int(track.get("sector_count", 0)) < 1:
+		errors.append("sector_count must be at least 1")
+
+	if typeof(track.get("segments")) != TYPE_ARRAY:
+		errors.append("missing 'segments' array")
+		return errors
+
+	var segments: Array = track["segments"]
+	if segments.size() < MIN_TRACK_SEGMENTS:
+		errors.append("track needs at least %d segments" % MIN_TRACK_SEGMENTS)
+	for index: int in segments.size():
+		errors.append_array(_validate_segment(index, segments[index]))
+	errors.append_array(_validate_pit(track.get("pit"), segments.size()))
+
+	if errors.is_empty() and not track_closes(track):
+		errors.append(
+			"corner angles total %.1f degrees, so the centreline does not close"
+			% track_turn_degrees(track)
+		)
+
+	return errors
+
+
+static func track_turn_degrees(track: Dictionary) -> float:
+	var total: float = 0.0
+	for entry: Variant in track.get("segments", []):
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var segment := entry as Dictionary
+		if str(segment.get("kind", "")) == "corner":
+			total += float(segment.get("angle_deg", 0.0))
+	return total
+
+
+static func track_closes(track: Dictionary) -> bool:
+	return absf(absf(track_turn_degrees(track)) - FULL_TURN_DEG) <= TRACK_CLOSURE_TOLERANCE_DEG
+
+
+static func track_length_m(track: Dictionary) -> float:
+	var total: float = 0.0
+	for entry: Variant in track.get("segments", []):
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var segment := entry as Dictionary
+		match str(segment.get("kind", "")):
+			"straight", "chicane":
+				total += float(segment.get("length_m", 0.0))
+			"corner":
+				var arc := absf(deg_to_rad(float(segment.get("angle_deg", 0.0))))
+				total += float(segment.get("radius_m", 0.0)) * arc
+	return total
+
+
+static func _validate_segment(index: int, entry: Variant) -> PackedStringArray:
+	var errors: PackedStringArray = []
+	if typeof(entry) != TYPE_DICTIONARY:
+		errors.append("segment %d is not an object" % index)
+		return errors
+
+	var segment := entry as Dictionary
+	var kind := str(segment.get("kind", ""))
+	match kind:
+		"straight":
+			if float(segment.get("length_m", 0.0)) <= 0.0:
+				errors.append("segment %d straight needs a positive length_m" % index)
+		"corner":
+			var angle := float(segment.get("angle_deg", 0.0))
+			if is_zero_approx(angle) or absf(angle) > MAX_CORNER_ANGLE_DEG:
+				errors.append(
+					"segment %d corner angle_deg must be non-zero and within %d degrees"
+					% [index, int(MAX_CORNER_ANGLE_DEG)]
+				)
+			if float(segment.get("radius_m", 0.0)) <= 0.0:
+				errors.append("segment %d corner needs a positive radius_m" % index)
+			if absf(float(segment.get("banking_deg", 0.0))) > MAX_BANKING_DEG:
+				errors.append(
+					"segment %d banking_deg exceeds %d degrees"
+					% [index, int(MAX_BANKING_DEG)]
+				)
+		"chicane":
+			if float(segment.get("length_m", 0.0)) <= 0.0:
+				errors.append("segment %d chicane needs a positive length_m" % index)
+			if is_zero_approx(float(segment.get("offset_m", 0.0))):
+				errors.append("segment %d chicane needs a non-zero offset_m" % index)
+		_:
+			errors.append("segment %d has unknown kind '%s'" % [index, kind])
+
+	return errors
+
+
+static func _validate_pit(data: Variant, segment_count: int) -> PackedStringArray:
+	var errors: PackedStringArray = []
+	if typeof(data) != TYPE_DICTIONARY:
+		errors.append("missing 'pit' object")
+		return errors
+
+	var pit := data as Dictionary
+	for field: String in ["entry_segment", "exit_segment"]:
+		if not pit.has(field):
+			errors.append("pit is missing '%s'" % field)
+			continue
+		var index := int(pit[field])
+		if index < 0 or index >= segment_count:
+			errors.append("pit %s %d is outside the segment list" % [field, index])
+	if pit.has("entry_segment") and int(pit["entry_segment"]) == int(pit.get("exit_segment", -1)):
+		errors.append("pit entry and exit cannot be the same segment")
+	if float(pit.get("lane_speed_kph", 0.0)) <= 0.0:
+		errors.append("pit lane_speed_kph must be positive")
 
 	return errors
 
