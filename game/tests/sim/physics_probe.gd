@@ -126,13 +126,21 @@ func _probe_cornering() -> void:
 	await harness.drive(DriverInput.create(1.0, 0.0, 0.0), 3 * TICK_RATE)
 
 	var start_heading := _heading(harness.car)
+	var start_x := harness.car.global_position.x
 	await harness.drive(DriverInput.create(0.45, 0.0, 1.0), 4 * TICK_RATE)
 	var turned := absf(rad_to_deg(angle_difference(start_heading, _heading(harness.car))))
+	var drift := harness.car.global_position.x - start_x
 
 	var upright := harness.car.global_transform.basis.y.dot(Vector3.UP)
-	Log.info(TAG, "cornering: turned %.0f deg, upright %.2f" % [turned, upright])
+	Log.info(TAG, "cornering: turned %.0f deg, drift %+.1f m, upright %.2f" % [
+		turned, drift, upright
+	])
 
 	_check(turned > 20.0, "steering input actually turns the car (%.0f deg)" % turned)
+	# The car starts facing -Z, so a right-hand input must carry it towards +X.
+	# Checking only the magnitude of the turn would miss axles fitted back to
+	# front, which steers the car with its rear wheels.
+	_check(drift > 1.0, "steering right sends the car right (%+.1f m)" % drift)
 	_check(upright > 0.7, "car stays upright through the corner")
 
 	_despawn(harness)

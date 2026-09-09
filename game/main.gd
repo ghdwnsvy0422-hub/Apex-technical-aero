@@ -21,6 +21,18 @@ func _ready() -> void:
 			add_child(preload("res://tests/sim/physics_probe.gd").new())
 		_:
 			Log.info(_TAG, "Client boot")
+			_start_client()
+
+
+func _start_client() -> void:
+	add_child(preload("res://client/test_drive.gd").new())
+
+	if not GameConfig.args.has("capture"):
+		return
+	var capture: Node = preload("res://client/screen_capture.gd").new()
+	capture.output_path = str(GameConfig.args["capture"])
+	capture.delay_frames = int(GameConfig.args.get("capture-frames", 240))
+	add_child(capture)
 
 
 ## Verifies the engine is configured the way the physics work assumes.

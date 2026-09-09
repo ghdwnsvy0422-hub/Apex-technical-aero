@@ -111,14 +111,15 @@ func center_of_mass_offset() -> Vector3:
 	return Vector3(0.0, com_height_above_ground - contact_depth(), 0.0)
 
 
-## The axle carrying less weight sits further from the centre of mass, so a
-## front bias below 0.5 places the front axle further forward.
+## Negative Z is forward in Godot, so the front axle sits at negative Z. The
+## axle carrying less weight sits further from the centre of mass, so a front
+## bias below 0.5 places the front axle further out.
 func front_axle_z() -> float:
-	return wheelbase * (1.0 - front_weight_bias)
+	return -wheelbase * (1.0 - front_weight_bias)
 
 
 func rear_axle_z() -> float:
-	return -wheelbase * front_weight_bias
+	return wheelbase * front_weight_bias
 
 
 ## Suspension rest position measured from the chassis origin, per wheel.

@@ -102,7 +102,15 @@ func test_rear_bias_puts_the_front_axle_further_from_the_centre_of_mass() -> voi
 
 
 func test_axle_positions_span_the_wheelbase() -> void:
-	assert_almost_eq(_setup.front_axle_z() - _setup.rear_axle_z(), _setup.wheelbase, 0.001)
+	assert_almost_eq(_setup.rear_axle_z() - _setup.front_axle_z(), _setup.wheelbase, 0.001)
+
+
+func test_front_axle_is_ahead_of_the_rear() -> void:
+	# Negative Z is forward. Getting this backwards steers the car with its
+	# rear wheels and flips aero balance, without changing any magnitude a
+	# test might otherwise check.
+	assert_lt(_setup.front_axle_z(), 0.0)
+	assert_gt(_setup.rear_axle_z(), 0.0)
 
 
 func test_centre_of_mass_sits_below_the_chassis_origin() -> void:

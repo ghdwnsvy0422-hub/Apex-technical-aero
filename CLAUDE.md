@@ -41,12 +41,21 @@ Godot 바이너리는 리포에 포함하지 않는다. `bin/`은 gitignore되�
 ./tools/godot.sh --headless --path game -- --sim                # 시뮬 하네스
 ```
 
+디스플레이가 없는 환경에서도 화면을 PNG로 뽑을 수 있다. Forward+는 Vulkan을 요구하므로 Xvfb + OpenGL 렌더러를 쓴다.
+
+```bash
+./tools/screenshot.sh /tmp/shot.png 260   # 260프레임 뒤 캡처
+```
+
+**시각적 변경은 반드시 캡처해서 눈으로 확인한다.** 차의 앞뒤가 뒤집힌 채로 물리 프로브를 전부 통과한 적이 있다 — 회두각의 크기만 봤기 때문이다. 스크린샷 한 장이 그걸 즉시 드러냈다.
+
 ---
 
 ## 디렉터리
 
 ```
 game/core     결정론적 시뮬레이션 코어 (물리, 차량, 타이어, 손상)
+game/client   클라이언트 전용 표현 계층 (입력, 카메라, 비주얼, 캡처)
 game/net      복제, 클라 예측, 서버 재조정
 game/track    스플라인 → 절차적 트랙 메시 생성
 game/data     부품 / 트랙 / 티어 정의 (JSON)
