@@ -18,6 +18,7 @@ func _ready() -> void:
 			Log.info(_TAG, "Dedicated server boot (port %d)" % GameConfig.server_port)
 		GameConfig.Mode.SIMULATION:
 			Log.info(_TAG, "Headless simulation boot")
+			add_child(preload("res://tests/sim/physics_probe.gd").new())
 		_:
 			Log.info(_TAG, "Client boot")
 
