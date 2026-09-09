@@ -9,9 +9,12 @@ extends Node3D
 ##
 ## Run with: tools/godot.sh --headless --fixed-fps 30 --path game -- --sim
 
+const Registry := preload("res://core/data_registry.gd")
+
 const TICK_RATE: int = 120
 const GRAVITY: float = 9.8
 const TAG: String = "Probe"
+const COMPILED_TRACK: String = "aurora_speedway"
 
 var _failures: PackedStringArray = []
 
@@ -23,6 +26,7 @@ func _ready() -> void:
 	await _probe_cornering()
 	await _probe_downforce_tradeoff()
 	await _probe_track_surfaces()
+	await _probe_compiled_track()
 	_report()
 
 
@@ -222,6 +226,42 @@ func _probe_track_surfaces() -> void:
 	Log.info(TAG, "surface grip: road %.2f | runoff %.2f" % [on_road, on_runoff])
 	_check(is_equal_approx(on_road, 1.0), "tyres see full grip on the road")
 	_check(on_runoff < on_road, "tyres lose grip on the runoff")
+
+	remove_child(car)
+	car.queue_free()
+	remove_child(track)
+	track.queue_free()
+
+
+## The shipped track is data, so nothing in the unit tests proves the geometry
+## it compiles to is something a car can actually stand on.
+func _probe_compiled_track() -> void:
+	var source := DataRegistry.get_track(COMPILED_TRACK)
+	_check(not source.is_empty(), "the shipped track loads")
+	if source.is_empty():
+		return
+
+	var track := TrackCompiler.build(source)
+	add_child(track)
+	track.build()
+
+	var expected := Registry.track_length_m(source)
+	Log.info(TAG, "compiled %s: %.0f m built, %.0f m of segments" % [
+		COMPILED_TRACK, track.length(), expected
+	])
+	_check(absf(track.length() - expected) < expected * 0.05, "compiled length matches the segments")
+
+	var car := CarBody.new()
+	var ride_height := car.setup.contact_depth() + 0.10
+	car.transform = track.start_transform(ride_height)
+	add_child(car)
+	await _settle(car)
+
+	Log.info(TAG, "start line: %d wheels down, grip %.2f" % [
+		car.grounded_wheel_count(), car.wheels[0].surface_friction
+	])
+	_check(car.grounded_wheel_count() == 4, "the car stands on the compiled track")
+	_check(is_equal_approx(car.wheels[0].surface_friction, 1.0), "the start line is road")
 
 	remove_child(car)
 	car.queue_free()
