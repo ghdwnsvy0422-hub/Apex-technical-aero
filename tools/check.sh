@@ -37,4 +37,10 @@ step "Physics probe"
 # driving run in seconds.
 timeout 900 "$GODOT" --headless --fixed-fps 30 --path "$GAME_DIR" -- --sim
 
+step "AI driver lap-time regression"
+# The probe drives the shipped track on the racing line and compares the flying
+# lap against a recorded baseline. Physics changes that leave the car drivable
+# but slower show up here and nowhere else.
+timeout 900 "$GODOT" --headless --fixed-fps 30 --path "$GAME_DIR" -- --sim --laptime
+
 printf '\n\033[32mAll checks passed.\033[0m\n'

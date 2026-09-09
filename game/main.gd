@@ -18,10 +18,16 @@ func _ready() -> void:
 			Log.info(_TAG, "Dedicated server boot (port %d)" % GameConfig.server_port)
 		GameConfig.Mode.SIMULATION:
 			Log.info(_TAG, "Headless simulation boot")
-			add_child(preload("res://tests/sim/physics_probe.gd").new())
+			add_child(_simulation_probe())
 		_:
 			Log.info(_TAG, "Client boot")
 			_start_client()
+
+
+func _simulation_probe() -> Node:
+	if GameConfig.args.has("laptime"):
+		return preload("res://tests/sim/lap_probe.gd").new()
+	return preload("res://tests/sim/physics_probe.gd").new()
 
 
 func _start_client() -> void:

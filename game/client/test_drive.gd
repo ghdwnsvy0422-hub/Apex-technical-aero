@@ -31,6 +31,8 @@ var _car: CarBody
 var _track: Track
 var _track_source: Dictionary = {}
 var _lap_timer: LapTimer
+var _racing_line: RacingLine
+var _ai_driver: AiDriver
 var _controls: PlayerInput
 var _top_camera: Camera3D
 var _autopilot: bool = false
@@ -73,34 +75,13 @@ func _process(_delta: float) -> void:
 		get_tree().quit()
 
 
-## Drives itself so a capture shows a car in motion rather than one parked at
-## the origin. Deliberately crude: this only has to keep the car roughly on the
-## road for a screenshot. The real racing-line driver arrives in Phase 1.7.
+## Runs the same AI driver the lap-time regression uses, so a capture shows the
+## car on the racing line rather than a hand-rolled approximation of one.
 func _scripted_input() -> DriverInput:
-	var throttle := clampf(0.25 + _elapsed / 4.0, 0.0, 0.55)
-	if _track == null:
-		return DriverInput.create(throttle, 0.0, sin(_elapsed * 0.35) * 0.30)
-	return DriverInput.create(throttle, 0.0, _steer_towards_centreline())
-
-
-func _steer_towards_centreline() -> float:
-	var curve := _track.curve
-	var here := _car.global_position
-	var offset := curve.get_closest_offset(here)
-	# Aim well ahead of the car: steering at the point beside it produces a
-	# permanent weave, because any correction arrives after the error has gone.
-	var lookahead := clampf(_car.linear_velocity.length() * 1.1, 25.0, 90.0)
-	var target := _track.frame_at_distance(offset + lookahead).origin
-
-	var forward := _car.global_transform.basis * Vector3.FORWARD
-	var to_target := (target - here)
-	to_target.y = 0.0
-	if to_target.length_squared() < 1.0:
-		return 0.0
-	# forward x up is the car's right, so a positive component means the target
-	# lies to the right and the car must steer right.
-	var lateral := to_target.normalized().dot(forward.cross(Vector3.UP).normalized())
-	return clampf(lateral * 3.0, -1.0, 1.0)
+	if _ai_driver == null or not _ai_driver.is_ready():
+		return DriverInput.create(clampf(0.25 + _elapsed / 4.0, 0.0, 0.55), 0.0,
+			sin(_elapsed * 0.35) * 0.30)
+	return _ai_driver.input_for(_car.global_transform, _car.linear_velocity)
 
 
 func _reset() -> void:
@@ -128,6 +109,8 @@ func _build_track() -> void:
 func _start_lap_timing() -> void:
 	if _track.length() <= 0.0:
 		return
+	_racing_line = RacingLine.from_curve(_track.curve, _track.profile.road_half_width)
+	_ai_driver = AiDriver.create(_racing_line, _track.curve)
 	_lap_timer = LapTimer.create(_track.length(), int(_track_source.get("sector_count", 3)))
 	_lap_timer.lap_completed.connect(_on_lap_completed)
 	_lap_timer.wrong_way_changed.connect(_on_wrong_way_changed)
