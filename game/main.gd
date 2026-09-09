@@ -27,6 +27,8 @@ func _ready() -> void:
 func _simulation_probe() -> Node:
 	if GameConfig.args.has("laptime"):
 		return preload("res://tests/sim/lap_probe.gd").new()
+	if GameConfig.args.has("sweep"):
+		return preload("res://tests/sim/setup_sweep.gd").new()
 	return preload("res://tests/sim/physics_probe.gd").new()
 
 
