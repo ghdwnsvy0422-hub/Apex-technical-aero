@@ -43,6 +43,9 @@ func _run_selfcheck() -> void:
 		if not InputMap.has_action(action):
 			failures.append("missing input action '%s'" % action)
 
+	for message: String in DataRegistry.load_errors:
+		failures.append("data: %s" % message)
+
 	if failures.is_empty():
 		Log.info(_TAG, "Selfcheck passed")
 		get_tree().quit(0)

@@ -17,6 +17,7 @@ config/quit_on_go_back=false
 
 Log="*res://core/log.gd"
 GameConfig="*res://core/game_config.gd"
+DataRegistry="*res://core/data_registry.gd"
 
 [debug]
 

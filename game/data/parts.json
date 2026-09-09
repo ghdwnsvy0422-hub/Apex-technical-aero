@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "_comment": "Stat values are contributions in 0-100 rating points; a car's stat is the clamped sum across its nine fitted parts. Rarity widens 'tuning' span only - it must never raise raw stats (PRD 26). Balance numbers here are placeholders until Phase 3.2.",
+  "parts": [
+    {
+      "id": "engine_baseline",
+      "name": "TR-6 Baseline",
+      "slot": "engine",
+      "rarity": "common",
+      "stats": {
+        "top_speed": 34,
+        "acceleration": 30,
+        "engine_durability": 55,
+        "energy_recovery": 18
+      }
+    },
+    {
+      "id": "front_wing_standard",
+      "name": "AeroLine Standard",
+      "slot": "front_wing",
+      "rarity": "common",
+      "stats": {
+        "downforce": 14,
+        "drag": 9,
+        "cornering": 11
+      },
+      "tuning": { "slider": "front_wing", "min": 40, "max": 60 }
+    },
+    {
+      "id": "front_wing_pro",
+      "name": "AeroLine Pro",
+      "slot": "front_wing",
+      "rarity": "rare",
+      "stats": {
+        "downforce": 14,
+        "drag": 9,
+        "cornering": 11
+      },
+      "tuning": { "slider": "front_wing", "min": 20, "max": 80 }
+    },
+    {
+      "id": "rear_wing_standard",
+      "name": "AeroLine Standard R",
+      "slot": "rear_wing",
+      "rarity": "common",
+      "stats": {
+        "downforce": 18,
+        "drag": 12,
+        "stability": 12
+      },
+      "tuning": { "slider": "rear_wing", "min": 40, "max": 60 }
+    },
+    {
+      "id": "rear_wing_pro",
+      "name": "AeroLine Pro R",
+      "slot": "rear_wing",
+      "rarity": "rare",
+      "stats": {
+        "downforce": 18,
+        "drag": 12,
+        "stability": 12
+      },
+      "tuning": { "slider": "rear_wing", "min": 20, "max": 80 }
+    },
+    {
+      "id": "tyres_control",
+      "name": "Control Casing",
+      "slot": "tyres",
+      "rarity": "common",
+      "stats": {
+        "cornering": 22,
+        "braking": 14,
+        "tyre_wear": 30
+      }
+    },
+    {
+      "id": "suspension_standard",
+      "name": "Torsion Standard",
+      "slot": "suspension",
+      "rarity": "common",
+      "stats": {
+        "cornering": 12,
+        "stability": 18
+      },
+      "tuning": { "slider": "suspension", "min": 40, "max": 60 }
+    },
+    {
+      "id": "brakes_standard",
+      "name": "Carbon Standard",
+      "slot": "brakes",
+      "rarity": "common",
+      "stats": {
+        "braking": 32,
+        "brake_wear": 30,
+        "stability": 8
+      },
+      "tuning": { "slider": "brake_balance", "min": 40, "max": 60 }
+    },
+    {
+      "id": "gearbox_standard",
+      "name": "SeqDrive Standard",
+      "slot": "gearbox",
+      "rarity": "common",
+      "stats": {
+        "acceleration": 20,
+        "top_speed": 18
+      },
+      "tuning": { "slider": "gear_ratio", "min": 40, "max": 60 }
+    },
+    {
+      "id": "gearbox_wide",
+      "name": "SeqDrive Wide",
+      "slot": "gearbox",
+      "rarity": "rare",
+      "stats": {
+        "acceleration": 20,
+        "top_speed": 18
+      },
+      "tuning": { "slider": "gear_ratio", "min": 15, "max": 85 }
+    },
+    {
+      "id": "energy_baseline",
+      "name": "ERS Baseline",
+      "slot": "energy_system",
+      "rarity": "common",
+      "stats": {
+        "energy_recovery": 32,
+        "energy_output": 40
+      }
+    },
+    {
+      "id": "chassis_baseline",
+      "name": "Monocoque Baseline",
+      "slot": "chassis",
+      "rarity": "common",
+      "stats": {
+        "stability": 20,
+        "drag": 14,
+        "cornering": 8,
+        "top_speed": 6
+      }
+    }
+  ]
+}

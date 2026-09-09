@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "_comment": "Track source format (PRODUCTION_PLAN part B-1). Segments are traversed in order from the start line; the compiler in Phase 1.4 turns them into a Curve3D, road mesh, collision, racing line, and sector splits. Corner angle is degrees turned, positive = right. Geometry here is a first draft and is not yet closure-verified.",
+  "id": "aurora_speedway",
+  "name": "Aurora Speedway",
+  "type": "high_speed",
+  "width_m": 15.0,
+  "race_laps": 8,
+  "sector_count": 3,
+  "segments": [
+    { "kind": "straight", "length_m": 850.0 },
+    { "kind": "corner", "angle_deg": 90.0, "radius_m": 120.0, "banking_deg": 3.0 },
+    { "kind": "straight", "length_m": 320.0 },
+    { "kind": "corner", "angle_deg": 45.0, "radius_m": 260.0, "elevation_m": 8.0 },
+    { "kind": "straight", "length_m": 180.0 },
+    { "kind": "corner", "angle_deg": 45.0, "radius_m": 200.0 },
+    { "kind": "straight", "length_m": 620.0 },
+    { "kind": "corner", "angle_deg": 90.0, "radius_m": 110.0 },
+    { "kind": "straight", "length_m": 300.0 },
+    { "kind": "corner", "angle_deg": 90.0, "radius_m": 140.0, "elevation_m": -8.0 },
+    { "kind": "straight", "length_m": 240.0 },
+    { "kind": "chicane", "length_m": 90.0, "offset_m": 12.0 },
+    { "kind": "straight", "length_m": 200.0 }
+  ],
+  "pit": {
+    "entry_segment": 10,
+    "exit_segment": 1,
+    "lane_speed_kph": 80.0
+  }
+}
