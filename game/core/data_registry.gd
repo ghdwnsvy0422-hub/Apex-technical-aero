@@ -25,6 +25,7 @@ const MAX_CORNER_ANGLE_DEG: float = 180.0
 const MAX_BANKING_DEG: float = 15.0
 const FULL_TURN_DEG: float = 360.0
 const TRACK_CLOSURE_TOLERANCE_DEG: float = 5.0
+const MAX_CLOSURE_GAP_M: float = 2.0
 
 const _TAG := "Data"
 
@@ -283,11 +284,19 @@ static func validate_track(data: Variant) -> PackedStringArray:
 		errors.append_array(_validate_segment(index, segments[index]))
 	errors.append_array(_validate_pit(track.get("pit"), segments.size()))
 
-	if errors.is_empty() and not track_closes(track):
+	if not errors.is_empty():
+		return errors
+
+	if not track_closes(track):
 		errors.append(
 			"corner angles total %.1f degrees, so the centreline does not close"
 			% track_turn_degrees(track)
 		)
+		return errors
+
+	var gap := TrackLayout.from_track(track).closure_gap_m()
+	if gap > MAX_CLOSURE_GAP_M:
+		errors.append("centreline ends %.1f m away from the start line" % gap)
 
 	return errors
 

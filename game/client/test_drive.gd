@@ -4,6 +4,8 @@ extends Node3D
 ## Phase 1.3 replaces the ground plane with a real generated track; this exists
 ## so the handling can be felt before there is anywhere to drive.
 
+const DEFAULT_TRACK := "aurora_speedway"
+
 const GROUND_EXTENT: float = 6000.0
 const GROUND_THICKNESS: float = 4.0
 
@@ -111,10 +113,22 @@ func _start_transform() -> Transform3D:
 
 
 func _build_track() -> void:
-	_track = Track.new()
-	_track.curve = CurveBuilder.oval(900.0, 260.0, 6.0)
+	_track = _compiled_track()
 	add_child(_track)
 	_track.build()
+
+
+func _compiled_track() -> Track:
+	var id := str(GameConfig.args.get("track", DEFAULT_TRACK))
+	var source := DataRegistry.get_track(id)
+	if source.is_empty():
+		Log.error("TestDrive", "Unknown track '%s', falling back to the test oval" % id)
+		var oval := Track.new()
+		oval.curve = CurveBuilder.oval(900.0, 260.0, 6.0)
+		return oval
+
+	Log.info("TestDrive", "Track %s (%s)" % [source.get("name", id), id])
+	return TrackCompiler.build(source)
 
 
 func _spawn_car() -> void:

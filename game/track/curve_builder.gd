@@ -64,6 +64,21 @@ static func _add_arc(
 		in_corner.append(true)
 
 
+static func smooth_loop(values: PackedFloat32Array, window: int) -> PackedFloat32Array:
+	var smoothed := PackedFloat32Array()
+	var count := values.size()
+	smoothed.resize(count)
+	if count == 0 or window <= 0:
+		return values.duplicate()
+
+	for index: int in count:
+		var total := 0.0
+		for offset: int in range(-window, window + 1):
+			total += values[posmod(index + offset, count)]
+		smoothed[index] = total / (2.0 * window + 1.0)
+	return smoothed
+
+
 ## Averages the corner flag over a window so banking ramps in and out instead
 ## of switching on at the corner entry.
 static func _blend_banking(in_corner: Array[bool], banking: float) -> PackedFloat32Array:
@@ -74,8 +89,5 @@ static func _blend_banking(in_corner: Array[bool], banking: float) -> PackedFloa
 		return tilts
 
 	for index: int in count:
-		var total := 0.0
-		for offset: int in range(-BANK_BLEND_POINTS, BANK_BLEND_POINTS + 1):
-			total += 1.0 if in_corner[(index + offset + count) % count] else 0.0
-		tilts[index] = banking * total / (2.0 * BANK_BLEND_POINTS + 1.0)
-	return tilts
+		tilts[index] = banking if in_corner[index] else 0.0
+	return smooth_loop(tilts, BANK_BLEND_POINTS)

@@ -127,6 +127,23 @@ func test_pit_entry_and_exit_must_differ() -> void:
 	assert_eq(Registry.validate_track(track).size(), 1)
 
 
+func test_layout_that_never_returns_to_the_start_is_rejected() -> void:
+	var track := _minimal_track({
+		"segments": [
+			{"kind": "straight", "length_m": 400.0},
+			{"kind": "corner", "angle_deg": 90.0, "radius_m": 100.0},
+			{"kind": "straight", "length_m": 200.0},
+			{"kind": "corner", "angle_deg": 90.0, "radius_m": 100.0},
+			{"kind": "straight", "length_m": 100.0},
+			{"kind": "corner", "angle_deg": 90.0, "radius_m": 100.0},
+			{"kind": "straight", "length_m": 200.0},
+			{"kind": "corner", "angle_deg": 90.0, "radius_m": 100.0},
+		],
+		"pit": {"entry_segment": 6, "exit_segment": 0, "lane_speed_kph": 80.0},
+	})
+	assert_eq(Registry.validate_track(track).size(), 1, "angles close but the layout does not")
+
+
 func test_unknown_track_type_is_rejected() -> void:
 	assert_eq(Registry.validate_track(_minimal_track({"type": "rally"})).size(), 1)
 
