@@ -20,6 +20,7 @@ export_presets.cfg
 *.out
 
 # Tooling
+/bin/
 /tools/bin/
 node_modules/
 

@@ -20,23 +20,26 @@
 
 ## 실행
 
-Godot 바이너리는 리포에 포함하지 않는다. 4.4-stable 리눅스 빌드를 받아 사용한다.
+Godot 바이너리는 리포에 포함하지 않는다. `bin/`은 gitignore되어 있다.
 
 ```bash
-# 환경 자가 검증 (물리 엔진 / 틱레이트 / 입력 액션)
-godot --headless --path game -- --selfcheck
+# 최초 1회: 고정 버전(4.4-stable) 설치 → bin/godot
+./tools/install_godot.sh
 
-# 클라이언트
-godot --path game
-
-# 전용 서버
-godot --headless --path game -- --server --port=27015
-
-# 헤드리스 시뮬레이션 (AI 드라이버 랩타임 계측)
-godot --headless --path game -- --sim
+# 커밋 전 게이트: 임포트 + 환경 자가 검증 + 전체 테스트
+./tools/check.sh
 ```
 
-`--selfcheck`는 exit code로 성공/실패를 반환한다. CI와 커밋 전 확인에 사용한다.
+엔진 버전을 고정하는 이유는 업데이트가 물리 거동을 조용히 바꾸기 때문이다. 그러면 원인 불명의 랩타임 회귀로 나타난다.
+
+개별 실행은 `tools/godot.sh`를 거친다(`$GODOT` → `bin/godot` → PATH 순으로 탐색).
+
+```bash
+./tools/godot.sh --path game                                    # 클라이언트
+./tools/godot.sh --headless --path game -- --selfcheck          # 환경 검증
+./tools/godot.sh --headless --path game -- --server --port=27015  # 전용 서버
+./tools/godot.sh --headless --path game -- --sim                # 시뮬 하네스
+```
 
 ---
 
@@ -135,11 +138,14 @@ Log.info("Race", "Lap %d completed by %s" % [lap, driver_name])
 
 ## 검증
 
-AI가 "됐습니다"라고 말하는 것과 실제로 되는 것은 다르다. 변경 후에는 다음을 실제로 실행해 확인한다.
+AI가 "됐습니다"라고 말하는 것과 실제로 되는 것은 다르다. 변경 후에는 `./tools/check.sh`를 **실제로 실행해** 확인한다. 이 게이트는 다음을 순서대로 돌린다.
 
-1. `--selfcheck` 통과
-2. GUT 단위 테스트 통과 (Stage 0.2 이후)
-3. 물리를 건드렸다면 AI 드라이버 랩타임 회귀 확인 (Phase 1.7 이후)
+1. 리소스 임포트
+2. 환경 자가 검증(`--selfcheck`) — Jolt 활성, 120Hz, 입력 액션 존재
+3. GUT 단위 테스트 (`game/tests`)
+4. AI 드라이버 랩타임 회귀 (Phase 1.7 이후 추가)
+
+테스트는 `game/tests/unit/test_*.gd`에 두고 `GutTest`를 상속한다. 순수 로직은 `static` 함수로 빼서 노드 인스턴스 없이 테스트한다 — 코어가 헤드리스에서 돌아야 한다는 규칙과 같은 이유다.
 
 물리 변경은 특히 조용히 망가진다. "고쳤는데 차가 못 달리게 됨"은 사람이 아니라 랩타임 회귀 테스트가 잡아야 한다.
 
