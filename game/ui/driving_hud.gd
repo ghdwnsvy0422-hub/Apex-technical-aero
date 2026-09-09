@@ -8,13 +8,20 @@ extends Control
 const REDLINE_COLOUR := Color(0.92, 0.22, 0.18)
 const BAR_COLOUR := Color(0.35, 0.78, 0.98)
 const PANEL_COLOUR := Color(0.05, 0.06, 0.09, 0.72)
+const DIM_COLOUR := Color(0.72, 0.76, 0.82)
+const INVALID_COLOUR := Color(0.98, 0.62, 0.25)
 
 var car: CarBody
+var lap_timer: LapTimer
 
 var _speed_label: Label
 var _gear_label: Label
 var _rpm_fill: ColorRect
 var _rpm_width: float = 240.0
+var _lap_label: Label
+var _lap_time_label: Label
+var _splits_label: Label
+var _wrong_way_label: Label
 
 
 func _ready() -> void:
@@ -37,6 +44,23 @@ func _process(_delta: float) -> void:
 	var fraction := clampf(car.engine_rpm / redline, 0.0, 1.0)
 	_rpm_fill.size.x = _rpm_width * fraction
 	_rpm_fill.color = REDLINE_COLOUR if fraction > 0.92 else BAR_COLOUR
+
+	_update_timing()
+
+
+func _update_timing() -> void:
+	if lap_timer == null:
+		return
+
+	_lap_label.text = "LAP %d  S%d" % [lap_timer.laps_completed + 1, lap_timer.sector + 1]
+	_lap_time_label.text = LapTimer.format_time(lap_timer.current_lap_s())
+	_lap_time_label.add_theme_color_override(
+		"font_color", INVALID_COLOUR if not lap_timer.lap_valid else Color.WHITE
+	)
+	_splits_label.text = "LAST %s   BEST %s" % [
+		LapTimer.format_time(lap_timer.last_lap_s), LapTimer.format_time(lap_timer.best_lap_s)
+	]
+	_wrong_way_label.visible = lap_timer.wrong_way
 
 
 func _build() -> void:
@@ -80,6 +104,40 @@ func _build() -> void:
 	_rpm_fill.size = Vector2(0.0, 14.0)
 	_rpm_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	track.add_child(_rpm_fill)
+
+	_build_timing()
+
+
+func _build_timing() -> void:
+	var panel := ColorRect.new()
+	panel.color = PANEL_COLOUR
+	panel.position = Vector2(30.0, 30.0)
+	panel.size = Vector2(320.0, 118.0)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(panel)
+
+	_lap_label = _label(22, DIM_COLOUR)
+	_lap_label.text = "LAP 1  S1"
+	_lap_label.position = Vector2(18.0, 8.0)
+	panel.add_child(_lap_label)
+
+	_lap_time_label = _label(46, Color.WHITE)
+	_lap_time_label.text = LapTimer.format_time(0.0)
+	_lap_time_label.position = Vector2(18.0, 34.0)
+	panel.add_child(_lap_time_label)
+
+	_splits_label = _label(17, DIM_COLOUR)
+	_splits_label.position = Vector2(18.0, 88.0)
+	panel.add_child(_splits_label)
+
+	_wrong_way_label = _label(40, REDLINE_COLOUR)
+	_wrong_way_label.text = "WRONG WAY"
+	_wrong_way_label.anchor_left = 0.5
+	_wrong_way_label.anchor_right = 0.5
+	_wrong_way_label.offset_left = -140.0
+	_wrong_way_label.offset_top = 120.0
+	_wrong_way_label.visible = false
+	add_child(_wrong_way_label)
 
 
 func _label(size: int, colour: Color) -> Label:

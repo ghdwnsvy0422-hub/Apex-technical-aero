@@ -29,6 +29,8 @@ void fragment() {
 
 var _car: CarBody
 var _track: Track
+var _track_source: Dictionary = {}
+var _lap_timer: LapTimer
 var _controls: PlayerInput
 var _top_camera: Camera3D
 var _autopilot: bool = false
@@ -50,6 +52,8 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_elapsed += delta
 	_car.input = _scripted_input() if _autopilot else _controls.poll(delta)
+	if _lap_timer != null:
+		_lap_timer.update(_track.curve.get_closest_offset(_car.global_position), _elapsed)
 	_ticks += 1
 	if _autopilot and _ticks % 480 == 0:
 		Log.info("TestDrive", "t=%.0f v=%.0f steer=%+.2f grounded=%d pos=%v" % [
@@ -103,6 +107,8 @@ func _reset() -> void:
 	_elapsed = 0.0
 	_controls.reset()
 	_car.teleport_to(_start_transform())
+	if _lap_timer != null:
+		_lap_timer.start(_track.curve.get_closest_offset(_car.global_position), _elapsed)
 
 
 func _start_transform() -> Transform3D:
@@ -116,19 +122,39 @@ func _build_track() -> void:
 	_track = _compiled_track()
 	add_child(_track)
 	_track.build()
+	_start_lap_timing()
+
+
+func _start_lap_timing() -> void:
+	if _track.length() <= 0.0:
+		return
+	_lap_timer = LapTimer.create(_track.length(), int(_track_source.get("sector_count", 3)))
+	_lap_timer.lap_completed.connect(_on_lap_completed)
+	_lap_timer.wrong_way_changed.connect(_on_wrong_way_changed)
+
+
+func _on_lap_completed(lap: int, seconds: float) -> void:
+	Log.info("TestDrive", "Lap %d in %s, best %s" % [
+		lap, LapTimer.format_time(seconds), LapTimer.format_time(_lap_timer.best_lap_s)
+	])
+
+
+func _on_wrong_way_changed(active: bool) -> void:
+	if active:
+		Log.warn("TestDrive", "Wrong way")
 
 
 func _compiled_track() -> Track:
 	var id := str(GameConfig.args.get("track", DEFAULT_TRACK))
-	var source := DataRegistry.get_track(id)
-	if source.is_empty():
+	_track_source = DataRegistry.get_track(id)
+	if _track_source.is_empty():
 		Log.error("TestDrive", "Unknown track '%s', falling back to the test oval" % id)
 		var oval := Track.new()
 		oval.curve = CurveBuilder.oval(900.0, 260.0, 6.0)
 		return oval
 
-	Log.info("TestDrive", "Track %s (%s)" % [source.get("name", id), id])
-	return TrackCompiler.build(source)
+	Log.info("TestDrive", "Track %s (%s)" % [_track_source.get("name", id), id])
+	return TrackCompiler.build(_track_source)
 
 
 func _spawn_car() -> void:
@@ -159,6 +185,7 @@ func _spawn_car() -> void:
 	var overlay := CanvasLayer.new()
 	var hud := DrivingHud.new()
 	hud.car = _car
+	hud.lap_timer = _lap_timer
 	overlay.add_child(hud)
 	add_child(overlay)
 
