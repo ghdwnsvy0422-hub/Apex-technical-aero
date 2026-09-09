@@ -180,6 +180,12 @@ Godot의 `Vector3.rotated(Vector3.UP, a)`는 **반대 부호**로 돈다(오른�
 
 지금은 경계를 뒤로 넘거나 역주행이 감지되면 그 랩을 `lap_valid = false`로 무효 처리하고, 무효 랩은 기록에도 시그널에도 남기지 않는다. HUD는 무효 랩의 시간을 주황색으로 표시한다.
 
+### 6.13 GUT의 고아 노드 집계는 우리 코드만 세지 않는다
+
+Phase 1.5 이후 실행 요약에 `Total orphans = 17`이 나타났다. 트랙 컴파일 / 레이아웃 / 랩 타이머 / 커브 샘플링 / `Track` 생성 후 `free()`까지 각 호출 전후로 `Performance.OBJECT_ORPHAN_NODE_COUNT`를 재보면 **전부 0**이다. 남는 숫자는 테스트 스크립트 인스턴스와 GUT의 시그널 감시 정리분이고, GUT 스스로도 "이 수치에 GUT 객체가 완전히 빠지지는 않는다"고 적어 둔다.
+
+그래서 실행 요약의 숫자를 쫓지 말고, 누수를 잡고 싶은 지점에 `assert_no_new_orphans()`를 걸어라. `test_compiling_a_track_and_timing_a_lap_leaks_no_nodes`가 그 역할을 한다 — 트랙을 컴파일하고 랩을 재는 경로가 노드를 흘리면 그 테스트가 실패한다.
+
 ---
 
 ## 7. 코딩 규칙

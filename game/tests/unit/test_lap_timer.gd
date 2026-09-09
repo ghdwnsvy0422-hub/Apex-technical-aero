@@ -168,6 +168,19 @@ func _wrapped(value: float, length: float) -> float:
 	return value
 
 
+func test_compiling_a_track_and_timing_a_lap_leaks_no_nodes() -> void:
+	var track := Registry.read_json(SHIPPED_TRACK) as Dictionary
+	var curve := TrackCompiler.curve_from(track)
+	var timer := LapTimer.create(curve.get_baked_length(), SECTORS)
+	timer.update(0.0, 0.0)
+	timer.update(500.0, 10.0)
+
+	var node := TrackCompiler.build(track)
+	node.free()
+
+	assert_no_new_orphans("compiling a track and timing a lap")
+
+
 func test_lap_time_formatting() -> void:
 	assert_eq(LapTimer.format_time(0.0), "--:--.---")
 	assert_eq(LapTimer.format_time(76.5), "1:16.500")
