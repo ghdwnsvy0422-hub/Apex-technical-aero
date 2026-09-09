@@ -1,0 +1,33 @@
+# Godot
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+*.translation
+
+# Godot exports
+/build/
+/export/
+
+# Godot editor-local
+.godot/editor/
+*.tmp
+
+# Backend (Go)
+/backend/bin/
+*.exe
+*.test
+*.out
+
+# Tooling
+/tools/bin/
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets / env
+.env
+.env.local
+*.local.json
