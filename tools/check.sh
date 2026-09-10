@@ -37,6 +37,13 @@ step "Physics probe"
 # driving run in seconds.
 timeout 900 "$GODOT" --headless --fixed-fps 30 --path "$GAME_DIR" -- --sim
 
+step "Driving feel probe"
+# Handling metrics rather than lap time: a physics change can leave the car as
+# quick as ever while making it undriveable. The bounds are wide on purpose -
+# this asks whether the car is still sane, not whether it is fun. See
+# docs/DRIVING_FEEL.md.
+timeout 900 "$GODOT" --headless --fixed-fps 30 --path "$GAME_DIR" -- --sim --feel
+
 step "AI driver lap-time regression"
 # The probe drives the shipped track on the racing line and compares the flying
 # lap against a recorded baseline. Physics changes that leave the car drivable
