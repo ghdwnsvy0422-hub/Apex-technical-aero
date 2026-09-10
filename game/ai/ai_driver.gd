@@ -14,6 +14,14 @@ const BRAKE_GAIN: float = 0.22
 const TRACTION_FLOOR_THROTTLE: float = 0.28
 const TRACTION_RAMP_MPS: float = 16.0
 
+const SLIP_DEADBAND_RAD: float = 0.10
+const SLIP_MEASURABLE_MPS: float = 3.0
+const COUNTERSTEER_GAIN: float = 1.8
+const SLIDE_THROTTLE_FLOOR: float = 0.10
+const SLIDE_THROTTLE_SPAN_RAD: float = 0.16
+const SLIDE_BRAKE_FLOOR: float = 0.20
+const SLIDE_BRAKE_SPAN_RAD: float = 0.16
+
 var line: RacingLine
 var curve: Curve3D
 
@@ -42,11 +50,12 @@ func input_for(car_transform: Transform3D, velocity: Vector3) -> DriverInput:
 	var speed := velocity.length()
 	var offset := centreline_offset(car_transform.origin)
 	var target_speed := line.speed_for_offset(offset + speed * SPEED_PREVIEW_SECONDS)
+	var slip := body_slip_angle(car_transform, velocity)
 
 	return DriverInput.create(
-		throttle_for(speed, target_speed),
-		brake_for(speed, target_speed),
-		steer_towards_line(car_transform, offset, speed)
+		throttle_for(speed, target_speed) * slide_throttle_ceiling(slip),
+		brake_for(speed, target_speed) * slide_brake_ceiling(slip),
+		steer_towards_line(car_transform, offset, speed) + countersteer_for(slip)
 	)
 
 
@@ -71,6 +80,43 @@ static func steer_towards_point(car_transform: Transform3D, target: Vector3) -> 
 		return 0.0
 
 	return clampf(to_target.normalized().dot(right.normalized()) * STEER_GAIN, -1.0, 1.0)
+
+
+static func body_slip_angle(car_transform: Transform3D, velocity: Vector3) -> float:
+	var travel := Vector3(velocity.x, 0.0, velocity.z)
+	if travel.length() < SLIP_MEASURABLE_MPS:
+		return 0.0
+
+	var forward := car_transform.basis * Vector3.FORWARD
+	forward.y = 0.0
+	if forward.length_squared() < 0.000001:
+		return 0.0
+	forward = forward.normalized()
+
+	return atan2(travel.dot(forward.cross(Vector3.UP)), travel.dot(forward))
+
+
+static func slip_beyond_deadband(slip: float) -> float:
+	return signf(slip) * maxf(absf(slip) - SLIP_DEADBAND_RAD, 0.0)
+
+
+static func countersteer_for(slip: float) -> float:
+	return clampf(slip_beyond_deadband(slip) * COUNTERSTEER_GAIN, -1.0, 1.0)
+
+
+static func slide_throttle_ceiling(slip: float) -> float:
+	return _slide_ceiling(slip, SLIDE_THROTTLE_FLOOR, SLIDE_THROTTLE_SPAN_RAD)
+
+
+static func slide_brake_ceiling(slip: float) -> float:
+	return _slide_ceiling(slip, SLIDE_BRAKE_FLOOR, SLIDE_BRAKE_SPAN_RAD)
+
+
+static func _slide_ceiling(slip: float, floor_fraction: float, span_rad: float) -> float:
+	var excess := absf(slip_beyond_deadband(slip))
+	if excess <= 0.0:
+		return 1.0
+	return lerpf(1.0, floor_fraction, minf(excess / span_rad, 1.0))
 
 
 static func throttle_for(speed: float, target_speed: float) -> float:

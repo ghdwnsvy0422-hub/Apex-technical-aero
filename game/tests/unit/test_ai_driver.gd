@@ -118,3 +118,75 @@ func test_the_driver_asks_for_a_sane_input_everywhere_on_the_lap() -> void:
 		assert_between(input.brake, 0.0, 1.0, "brake at %.0f m" % offset)
 		assert_eq(input.throttle * input.brake, 0.0, "no braking on the throttle at %.0f m" % offset)
 		offset += 50.0
+
+
+func travelling(heading_deg: float, speed: float) -> Vector3:
+	return Vector3(0.0, 0.0, -speed).rotated(Vector3.UP, -deg_to_rad(heading_deg))
+
+
+func test_a_car_going_where_it_points_has_no_slip() -> void:
+	var slip := AiDriver.body_slip_angle(facing_forward(), Vector3(0.0, 0.0, -80.0))
+	assert_almost_eq(slip, 0.0, 0.0001)
+
+
+func test_travelling_right_of_the_nose_reads_as_positive_slip() -> void:
+	var slip := AiDriver.body_slip_angle(facing_forward(), travelling(30.0, 60.0))
+	assert_almost_eq(rad_to_deg(slip), 30.0, 0.01)
+
+
+func test_travelling_left_of_the_nose_reads_as_negative_slip() -> void:
+	var slip := AiDriver.body_slip_angle(facing_forward(), travelling(-30.0, 60.0))
+	assert_almost_eq(rad_to_deg(slip), -30.0, 0.01)
+
+
+func test_vertical_motion_does_not_read_as_slip() -> void:
+	var dropping := Vector3(0.0, -9.0, -80.0)
+	assert_almost_eq(AiDriver.body_slip_angle(facing_forward(), dropping), 0.0, 0.0001)
+
+
+func test_a_nearly_stationary_car_reports_no_slip() -> void:
+	var crawling := travelling(45.0, AiDriver.SLIP_MEASURABLE_MPS - 0.5)
+	assert_eq(AiDriver.body_slip_angle(facing_forward(), crawling), 0.0)
+
+
+func test_the_driver_steers_into_the_slide() -> void:
+	assert_gt(AiDriver.countersteer_for(deg_to_rad(25.0)), 0.0)
+	assert_lt(AiDriver.countersteer_for(deg_to_rad(-25.0)), 0.0)
+
+
+func test_countersteer_reaches_full_lock_in_a_big_slide() -> void:
+	assert_almost_eq(AiDriver.countersteer_for(deg_to_rad(90.0)), 1.0, 0.0001)
+	assert_almost_eq(AiDriver.countersteer_for(deg_to_rad(-90.0)), -1.0, 0.0001)
+
+
+func test_cornering_slip_is_left_alone() -> void:
+	for slip_deg: float in [-2.5, -1.7, 0.0, 1.7, 2.5]:
+		var slip := deg_to_rad(slip_deg)
+		assert_eq(AiDriver.countersteer_for(slip), 0.0, "%.1f deg is ordinary cornering" % slip_deg)
+		assert_eq(AiDriver.slide_throttle_ceiling(slip), 1.0)
+		assert_eq(AiDriver.slide_brake_ceiling(slip), 1.0)
+
+
+func test_a_slide_takes_the_throttle_away() -> void:
+	var sliding := AiDriver.slide_throttle_ceiling(deg_to_rad(20.0))
+	assert_almost_eq(sliding, AiDriver.SLIDE_THROTTLE_FLOOR, 0.0001)
+	assert_lt(AiDriver.slide_throttle_ceiling(deg_to_rad(8.0)), 1.0)
+
+
+func test_a_slide_eases_off_the_brake() -> void:
+	var sliding := AiDriver.slide_brake_ceiling(deg_to_rad(20.0))
+	assert_almost_eq(sliding, AiDriver.SLIDE_BRAKE_FLOOR, 0.0001)
+
+
+func test_the_slide_response_grows_with_the_slide() -> void:
+	var mild := AiDriver.slide_throttle_ceiling(deg_to_rad(7.0))
+	var worse := AiDriver.slide_throttle_ceiling(deg_to_rad(11.0))
+	assert_lt(worse, mild)
+	assert_gt(AiDriver.countersteer_for(deg_to_rad(11.0)), AiDriver.countersteer_for(deg_to_rad(7.0)))
+
+
+func test_a_spinning_car_gets_countersteer_and_no_throttle() -> void:
+	var spun := travelling(45.0, 40.0)
+	var input := _driver.input_for(facing_forward(), spun)
+	assert_gt(input.steer, 0.5, "the wheel goes into the slide")
+	assert_lt(input.throttle, 0.2, "and the power comes off")
