@@ -3,7 +3,7 @@ extends Node3D
 const TAG: String = "FeelSweep"
 
 const COM_HEIGHTS: Array[float] = [0.22, 0.28, 0.34]
-const AERO_BALANCES: Array[float] = [0.38, 0.42, 0.45, 0.47, 0.49, 0.52]
+const AERO_BALANCES: Array[float] = [0.38, 0.42, 0.45, 0.46, 0.465, 0.47, 0.52]
 const STEER_FACTORS: Array[float] = [0.16, 0.22, 0.30]
 
 var _rows: Array[Dictionary] = []
@@ -62,10 +62,10 @@ func _setup_with_steer_factor(value: float) -> CarSetup:
 
 func _print_table() -> void:
 	Log.info(TAG, "")
-	Log.info(TAG, "  axis          value   response  overshoot    balance  label       rotation  power gain  power slip  headroom  exit slip  brake slip")
+	Log.info(TAG, "  axis           value   response  overshoot    balance  label       rotation  power gain  power slip  headroom  exit slip  brake slip")
 	for row: Dictionary in _rows:
 		var metrics: HandlingMetrics = row["metrics"]
-		Log.info(TAG, "  %-12s  %5.2f  %6.3f s  %9.2f  %+6.2f deg  %-10s  %8.2f  %10.2f  %6.1f deg  %6.0f%%  %6.1f deg  %7.2f deg%s" % [
+		Log.info(TAG, "  %-12s  %6.3f  %6.3f s  %9.2f  %+6.2f deg  %-10s  %8.2f  %10.2f  %6.1f deg  %6.0f%%  %6.1f deg  %7.2f deg%s" % [
 			row["axis"],
 			row["value"],
 			metrics.steer_response_s,

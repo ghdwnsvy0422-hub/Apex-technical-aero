@@ -10,6 +10,7 @@ const MIN_BALANCE_DEG: float = -4.00
 const MIN_THROTTLE_HEADROOM: float = 0.40
 const MAX_EXIT_BODY_SLIP_DEG: float = 10.00
 const MAX_BRAKE_BODY_SLIP_DEG: float = 12.00
+const AERO_BALANCE_MARGIN: float = 0.01
 
 var _failures: PackedStringArray = []
 
@@ -18,7 +19,21 @@ func _ready() -> void:
 	var metrics: HandlingMetrics = await HandlingMetrics.measure(self, CarSetup.new())
 	Log.info(TAG, metrics.describe())
 	_report_metrics(metrics)
+	await _report_aero_balance_margin()
 	_report()
+
+
+func _report_aero_balance_margin() -> void:
+	var nudged := CarSetup.new()
+	nudged.aero_balance += AERO_BALANCE_MARGIN
+	var slip: float = await HandlingMetrics.measure_corner_exit(self, nudged)
+	Log.info(TAG, "aero balance %.3f corner exit: %.1f deg" % [nudged.aero_balance, slip])
+	_check(
+		slip <= MAX_EXIT_BODY_SLIP_DEG,
+		"aero balance keeps %.3f of margin before a normal exit spins (%.1f deg at %.3f)" % [
+			AERO_BALANCE_MARGIN, slip, nudged.aero_balance
+		]
+	)
 
 
 func _report_metrics(metrics: HandlingMetrics) -> void:

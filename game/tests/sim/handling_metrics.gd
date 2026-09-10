@@ -56,7 +56,7 @@ static func measure(host: Node, setup: CarSetup) -> HandlingMetrics:
 	metrics.power_body_slip_deg = corner.power_body_slip_deg
 
 	metrics.throttle_headroom = await _measure_throttle_headroom(host, setup)
-	metrics.exit_body_slip_deg = await _measure_corner_exit(host, setup)
+	metrics.exit_body_slip_deg = await measure_corner_exit(host, setup)
 	metrics.brake_body_slip_deg = await _measure_brake_stability(host, setup)
 	return metrics
 
@@ -254,7 +254,7 @@ static func exit_blend(elapsed_s: float, unwind_s: float) -> float:
 	return clampf(elapsed_s / unwind_s, 0.0, 1.0)
 
 
-static func _measure_corner_exit(host: Node, setup: CarSetup) -> float:
+static func measure_corner_exit(host: Node, setup: CarSetup) -> float:
 	var harness := _spawn(host, setup)
 	if not await _accelerate_to(host, harness, ENTRY_SPEED_KPH):
 		_despawn(host, harness)
