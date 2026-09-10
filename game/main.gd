@@ -29,6 +29,10 @@ func _simulation_probe() -> Node:
 		return preload("res://tests/sim/lap_probe.gd").new()
 	if GameConfig.args.has("sweep"):
 		return preload("res://tests/sim/setup_sweep.gd").new()
+	if GameConfig.args.has("feel"):
+		return preload("res://tests/sim/feel_probe.gd").new()
+	if GameConfig.args.has("feelsweep"):
+		return preload("res://tests/sim/feel_sweep.gd").new()
 	return preload("res://tests/sim/physics_probe.gd").new()
 
 
