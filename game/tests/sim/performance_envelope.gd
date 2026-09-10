@@ -10,6 +10,7 @@ const LAUNCH_RAMP_S: float = 2.5
 
 const ACCELERATION_FROM_KPH: float = 100.0
 const ACCELERATION_TO_KPH: float = 200.0
+const ACCELERATION_REFERENCE_KPH: float = 150.0
 const BRAKING_ENTRY_S: int = 8
 const BRAKING_FLOOR: float = 0.25
 const SKIDPAD_ENTRY_KPH: float = 180.0
@@ -23,6 +24,7 @@ var acceleration_g: float = 0.0
 var lateral_reference_speed_mps: float = 0.0
 var aero_load_ratio: float = 0.0
 var load_sensitivity: float = RacingLine.DEFAULT_LOAD_SENSITIVITY
+var acceleration_reference_speed_mps: float = 0.0
 
 
 static func measure(host: Node, setup: CarSetup) -> PerformanceEnvelope:
@@ -36,6 +38,7 @@ static func measure(host: Node, setup: CarSetup) -> PerformanceEnvelope:
 	envelope.lateral_reference_speed_mps = sample_speed_mps(skidpad)
 	envelope.aero_load_ratio = Aero.load_ratio_per_speed_squared(setup, GRAVITY)
 	envelope.load_sensitivity = setup.load_sensitivity
+	envelope.acceleration_reference_speed_mps = ACCELERATION_REFERENCE_KPH / 3.6
 	return envelope
 
 
@@ -50,7 +53,14 @@ static func sample_speed_mps(sample: Vector2) -> float:
 func apply_to(line: RacingLine) -> void:
 	line.compute_speeds(
 		lateral_g, braking_g, acceleration_g, top_speed_kph,
-		lateral_reference_speed_mps, aero_load_ratio, load_sensitivity
+		lateral_reference_speed_mps, aero_load_ratio, load_sensitivity,
+		acceleration_reference_speed_mps
+	)
+
+
+func acceleration_g_at(speed_mps: float) -> float:
+	return RacingLine.acceleration_at_speed(
+		acceleration_g, acceleration_reference_speed_mps, speed_mps, top_speed_kph / 3.6
 	)
 
 
@@ -70,6 +80,13 @@ func describe_grip() -> String:
 	return "lateral %.2f g measured at %.0f km/h | %.2f g at 120 km/h | %.2f g at 280 km/h" % [
 		lateral_g, lateral_reference_speed_mps * 3.6,
 		lateral_g_at(120.0 / 3.6), lateral_g_at(280.0 / 3.6)
+	]
+
+
+func describe_drive() -> String:
+	return "acceleration %.2f g at 150 km/h | %.2f g at 250 km/h | %.2f g at %.0f km/h" % [
+		acceleration_g_at(150.0 / 3.6), acceleration_g_at(250.0 / 3.6),
+		acceleration_g_at(top_speed_kph / 3.6 - 1.0), top_speed_kph
 	]
 
 

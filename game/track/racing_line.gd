@@ -56,7 +56,8 @@ func compute_speeds(
 	top_speed_kph: float = DEFAULT_TOP_SPEED_KPH,
 	lateral_reference_speed_mps: float = 0.0,
 	aero_load_ratio: float = DEFAULT_AERO_LOAD_RATIO,
-	load_sensitivity: float = DEFAULT_LOAD_SENSITIVITY
+	load_sensitivity: float = DEFAULT_LOAD_SENSITIVITY,
+	acceleration_reference_speed_mps: float = 0.0
 ) -> void:
 	var count := points.size()
 	speed_mps.resize(count)
@@ -74,9 +75,11 @@ func compute_speeds(
 		for index: int in count:
 			var ahead := posmod(index + 1, count)
 			var step := points[index].distance_to(points[ahead])
-			speed_mps[ahead] = minf(
-				speed_mps[ahead], _reachable(speed_mps[index], acceleration_g, step)
+			var here := speed_mps[index]
+			var pull := acceleration_at_speed(
+				acceleration_g, acceleration_reference_speed_mps, here, top_speed
 			)
+			speed_mps[ahead] = minf(speed_mps[ahead], _reachable(here, pull, step))
 		for reverse: int in count:
 			var index := count - 1 - reverse
 			var ahead := posmod(index + 1, count)
@@ -160,6 +163,28 @@ static func corner_speed(
 		if speed >= top_speed_mps:
 			return top_speed_mps
 	return minf(top_speed_mps, speed)
+
+
+static func drive_shape(speed_mps: float, top_speed_mps: float) -> float:
+	if speed_mps <= 0.0:
+		return 0.0
+	var cubed := top_speed_mps * top_speed_mps * top_speed_mps
+	return maxf(cubed / speed_mps - speed_mps * speed_mps, 0.0)
+
+
+static func acceleration_at_speed(
+	reference_g: float,
+	reference_speed_mps: float,
+	speed_mps: float,
+	top_speed_mps: float
+) -> float:
+	if reference_speed_mps <= 0.0 or top_speed_mps <= reference_speed_mps:
+		return reference_g
+	var measured := drive_shape(reference_speed_mps, top_speed_mps)
+	if measured <= 0.0:
+		return reference_g
+	var modelled := reference_g * drive_shape(minf(speed_mps, top_speed_mps), top_speed_mps) / measured
+	return minf(modelled, reference_g)
 
 
 static func menger_curvature(first: Vector3, second: Vector3, third: Vector3) -> float:

@@ -181,3 +181,58 @@ func test_the_default_speed_profile_is_unchanged_by_the_new_parameters() -> void
 	)
 	for index: int in defaults.size():
 		assert_eq(line.speed_mps[index], defaults[index], "sample %d" % index)
+
+
+func test_acceleration_is_unchanged_at_the_speed_it_was_measured() -> void:
+	assert_almost_eq(RacingLine.acceleration_at_speed(0.93, 41.7, 41.7, 86.0), 0.93, 0.0001)
+
+
+func test_acceleration_falls_away_towards_top_speed() -> void:
+	var mid := RacingLine.acceleration_at_speed(0.93, 41.7, 60.0, 86.0)
+	var late := RacingLine.acceleration_at_speed(0.93, 41.7, 80.0, 86.0)
+	assert_lt(late, mid)
+	assert_lt(mid, 0.93, "a car pulls less at 216 km/h than at 150 km/h")
+
+
+func test_a_car_at_its_top_speed_cannot_accelerate() -> void:
+	assert_almost_eq(RacingLine.acceleration_at_speed(0.93, 41.7, 86.0, 86.0), 0.0, 0.0001)
+
+
+func test_acceleration_never_goes_negative_past_top_speed() -> void:
+	assert_eq(RacingLine.acceleration_at_speed(0.93, 41.7, 200.0, 86.0), 0.0)
+
+
+func test_without_a_reference_speed_acceleration_stays_constant() -> void:
+	assert_eq(RacingLine.acceleration_at_speed(0.55, 0.0, 20.0, 86.0), 0.55)
+	assert_eq(RacingLine.acceleration_at_speed(0.55, 0.0, 80.0, 86.0), 0.55)
+
+
+func test_the_speed_profile_stops_promising_a_speed_the_car_cannot_reach() -> void:
+	var optimistic := RacingLine.from_curve(_curve, HALF_WIDTH)
+	optimistic.compute_speeds(2.4, 2.0, 0.93, 310.0)
+
+	var honest := RacingLine.from_curve(_curve, HALF_WIDTH)
+	honest.compute_speeds(2.4, 2.0, 0.93, 310.0, 0.0, 0.0, 1.0, 41.7)
+
+	assert_gt(honest.estimated_lap_seconds(), optimistic.estimated_lap_seconds(),
+		"an ideal lap that assumes constant acceleration to top speed is not achievable")
+
+
+func test_the_default_speed_profile_survives_the_acceleration_model() -> void:
+	var line := RacingLine.from_curve(_curve, HALF_WIDTH)
+	var defaults := line.speed_mps.duplicate()
+	line.compute_speeds()
+	for index: int in defaults.size():
+		assert_eq(line.speed_mps[index], defaults[index], "sample %d" % index)
+
+
+func test_acceleration_below_the_measured_speed_is_capped_at_what_was_measured() -> void:
+	for slow: float in [5.0, 10.0, 20.0, 30.0, 41.7]:
+		assert_lte(RacingLine.acceleration_at_speed(0.93, 41.7, slow, 86.0), 0.93,
+			"a car out of a slow corner is traction limited, not power limited (%.0f m/s)" % slow)
+
+
+func test_the_power_model_would_otherwise_demand_impossible_acceleration() -> void:
+	var raw := 0.93 * RacingLine.drive_shape(10.0, 86.0) / RacingLine.drive_shape(41.7, 86.0)
+	assert_gt(raw, 2.0, "the unclamped shape diverges as speed falls")
+	assert_lte(RacingLine.acceleration_at_speed(0.93, 41.7, 10.0, 86.0), 0.93)

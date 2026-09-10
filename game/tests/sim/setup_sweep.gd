@@ -3,7 +3,7 @@ extends Node3D
 const TAG: String = "Sweep"
 const TRACK_ID: String = "aurora_speedway"
 
-const DOWNFORCE_AREAS: Array[float] = [2.0, 3.0, 4.0, 5.0, 6.0]
+const DOWNFORCE_AREAS: Array[float] = [2.0, 4.0, 6.0, 8.0, 10.0]
 const TARGET_LAPS: int = 2
 const TIMEOUT_S: int = 400
 
@@ -33,6 +33,7 @@ func _measure_every_setup() -> Dictionary:
 		envelopes[downforce_area] = envelope
 		Log.info(TAG, "downforce %.1f: %s" % [downforce_area, envelope.describe()])
 		Log.info(TAG, "downforce %.1f: %s" % [downforce_area, envelope.describe_grip()])
+		Log.info(TAG, "downforce %.1f: %s" % [downforce_area, envelope.describe_drive()])
 	return envelopes
 
 
