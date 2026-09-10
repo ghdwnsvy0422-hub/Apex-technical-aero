@@ -8,6 +8,7 @@ const MAX_OVERSHOOT: float = 2.50
 const MAX_BALANCE_DEG: float = 6.00
 const MIN_BALANCE_DEG: float = -4.00
 const MIN_THROTTLE_HEADROOM: float = 0.40
+const MAX_EXIT_BODY_SLIP_DEG: float = 10.00
 const MAX_BRAKE_BODY_SLIP_DEG: float = 12.00
 
 var _failures: PackedStringArray = []
@@ -46,6 +47,12 @@ func _report_metrics(metrics: HandlingMetrics) -> void:
 		metrics.throttle_headroom >= MIN_THROTTLE_HEADROOM,
 		"the driver has throttle to spend at the cornering limit (%.0f%% usable, need %.0f%%)" % [
 			metrics.throttle_headroom * 100.0, MIN_THROTTLE_HEADROOM * 100.0
+		]
+	)
+	_check(
+		metrics.exit_body_slip_deg <= MAX_EXIT_BODY_SLIP_DEG,
+		"unwinding the wheel onto full throttle stays clean (%.1f deg, limit %.1f)" % [
+			metrics.exit_body_slip_deg, MAX_EXIT_BODY_SLIP_DEG
 		]
 	)
 	_check(

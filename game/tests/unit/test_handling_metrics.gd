@@ -147,6 +147,20 @@ func test_body_slip_of_a_stationary_car_is_zero() -> void:
 	car.free()
 
 
+func test_exit_blend_runs_from_corner_to_straight() -> void:
+	assert_almost_eq(HandlingMetrics.exit_blend(0.0, 1.0), 0.0, 0.00001)
+	assert_almost_eq(HandlingMetrics.exit_blend(0.5, 1.0), 0.5, 0.00001)
+	assert_almost_eq(HandlingMetrics.exit_blend(1.0, 1.0), 1.0, 0.00001)
+
+
+func test_exit_blend_holds_at_full_once_unwound() -> void:
+	assert_almost_eq(HandlingMetrics.exit_blend(4.0, 1.0), 1.0, 0.00001)
+
+
+func test_exit_blend_of_an_instant_unwind_is_immediate() -> void:
+	assert_eq(HandlingMetrics.exit_blend(0.0, 0.0), 1.0)
+
+
 func test_front_steer_angle_reports_the_applied_lock() -> void:
 	var car := CarBody.new()
 	var front := _wheel(true, 0.0)

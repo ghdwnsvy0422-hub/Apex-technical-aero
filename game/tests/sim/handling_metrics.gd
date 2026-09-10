@@ -21,6 +21,9 @@ const POWER_STEP_HOLD_S: float = 1.5
 const POWER_STEPS: Array[float] = [0.40, 0.50, 0.60, 0.70, 0.85, 1.00]
 const CONTROL_BODY_SLIP_DEG: float = 15.0
 
+const EXIT_UNWIND_S: float = 1.0
+const EXIT_HOLD_S: float = 1.5
+
 const BRAKE_ENTRY_KPH: float = 250.0
 const BRAKE_HOLD_S: float = 2.5
 const BRAKE_STEER: float = 0.10
@@ -34,6 +37,7 @@ var corner_rotation_ratio: float = 1.0
 var power_rotation_gain: float = 1.0
 var power_body_slip_deg: float = 0.0
 var throttle_headroom: float = 0.0
+var exit_body_slip_deg: float = 0.0
 var brake_body_slip_deg: float = 0.0
 
 
@@ -52,6 +56,7 @@ static func measure(host: Node, setup: CarSetup) -> HandlingMetrics:
 	metrics.power_body_slip_deg = corner.power_body_slip_deg
 
 	metrics.throttle_headroom = await _measure_throttle_headroom(host, setup)
+	metrics.exit_body_slip_deg = await _measure_corner_exit(host, setup)
 	metrics.brake_body_slip_deg = await _measure_brake_stability(host, setup)
 	return metrics
 
@@ -59,7 +64,8 @@ static func measure(host: Node, setup: CarSetup) -> HandlingMetrics:
 func describe() -> String:
 	return (
 		"response %.3f s | overshoot %.2f | balance %+.2f deg (%s) | rotation %.2f"
-		+ " | power gain %.2f | power slip %.1f deg | throttle headroom %.0f%% | brake slip %.1f deg"
+		+ " | power gain %.2f | power slip %.1f deg | throttle headroom %.0f%%"
+		+ " | exit slip %.1f deg | brake slip %.1f deg"
 	) % [
 		steer_response_s,
 		yaw_overshoot,
@@ -69,6 +75,7 @@ func describe() -> String:
 		power_rotation_gain,
 		power_body_slip_deg,
 		throttle_headroom * 100.0,
+		exit_body_slip_deg,
 		brake_body_slip_deg,
 	]
 
@@ -239,6 +246,45 @@ static func _run_steady_corner(
 	if result.rotation_ratio > 0.0:
 		result.power_rotation_gain = after / result.rotation_ratio
 	return result
+
+
+static func exit_blend(elapsed_s: float, unwind_s: float) -> float:
+	if unwind_s <= 0.0:
+		return 1.0
+	return clampf(elapsed_s / unwind_s, 0.0, 1.0)
+
+
+static func _measure_corner_exit(host: Node, setup: CarSetup) -> float:
+	var harness := _spawn(host, setup)
+	if not await _accelerate_to(host, harness, ENTRY_SPEED_KPH):
+		_despawn(host, harness)
+		return 0.0
+
+	await harness.drive(
+		DriverInput.create(CORNER_THROTTLE, 0.0, CORNER_STEER),
+		int(CORNER_SETTLE_S * TICK_RATE)
+	)
+
+	var entry_kph := harness.car.speed_kph()
+	var peak: float = 0.0
+	for tick: int in int((EXIT_UNWIND_S + EXIT_HOLD_S) * TICK_RATE):
+		var blend := exit_blend(float(tick) / TICK_RATE, EXIT_UNWIND_S)
+		harness.car.input = DriverInput.create(
+			lerpf(CORNER_THROTTLE, 1.0, blend),
+			0.0,
+			lerpf(CORNER_STEER, 0.0, blend)
+		)
+		await host.get_tree().physics_frame
+		peak = maxf(peak, body_slip_deg(harness.car))
+
+	Log.info(
+		LOG_TAG,
+		"corner exit: %.0f -> %.0f km/h | body slip peak %.1f deg" % [
+			entry_kph, harness.car.speed_kph(), peak
+		]
+	)
+	_despawn(host, harness)
+	return peak
 
 
 static func _measure_brake_stability(host: Node, setup: CarSetup) -> float:
