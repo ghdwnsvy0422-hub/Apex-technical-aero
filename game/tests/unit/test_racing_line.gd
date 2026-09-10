@@ -236,3 +236,75 @@ func test_the_power_model_would_otherwise_demand_impossible_acceleration() -> vo
 	var raw := 0.93 * RacingLine.drive_shape(10.0, 86.0) / RacingLine.drive_shape(41.7, 86.0)
 	assert_gt(raw, 2.0, "the unclamped shape diverges as speed falls")
 	assert_lte(RacingLine.acceleration_at_speed(0.93, 41.7, 10.0, 86.0), 0.93)
+
+
+func test_a_car_going_straight_has_its_whole_grip_for_the_throttle() -> void:
+	var usage := RacingLine.lateral_usage(0.0, 60.0, 2.4, 47.8, 0.0003, 0.85)
+	assert_eq(usage, 0.0)
+	assert_eq(RacingLine.longitudinal_share(usage), 1.0)
+
+
+func test_a_car_at_its_cornering_limit_has_nothing_left_for_the_throttle() -> void:
+	var bend := 0.004
+	var speed := RacingLine.corner_speed(bend, 2.4, 200.0, 47.8, 0.0003, 0.85)
+	var usage := RacingLine.lateral_usage(bend, speed, 2.4, 47.8, 0.0003, 0.85)
+	assert_almost_eq(usage, 1.0, 0.01, "corner speed is by definition the lateral limit")
+	assert_almost_eq(RacingLine.longitudinal_share(usage), 0.0, 0.1)
+
+
+func test_a_car_well_below_the_corner_speed_keeps_headroom_for_the_throttle() -> void:
+	var bend := 0.004
+	var limit := RacingLine.corner_speed(bend, 2.4, 200.0, 47.8, 0.0003, 0.85)
+	var slow := RacingLine.longitudinal_share(
+		RacingLine.lateral_usage(bend, limit * 0.5, 2.4, 47.8, 0.0003, 0.85)
+	)
+	var at_limit := RacingLine.longitudinal_share(
+		RacingLine.lateral_usage(bend, limit, 2.4, 47.8, 0.0003, 0.85)
+	)
+	assert_gt(slow, 0.5, "well inside the corner there is grip to spare")
+	assert_gt(slow, at_limit)
+
+
+func test_slowing_down_frees_less_grip_than_it_would_without_downforce() -> void:
+	var bend := 0.004
+	var winged := RacingLine.lateral_usage(bend, 40.0, 2.4, 47.8, 0.0003, 0.85)
+	var wingless := RacingLine.lateral_usage(bend, 40.0, 2.4, 47.8, 0.0, 0.85)
+	assert_gt(winged, wingless,
+		"a winged car loses grip as it slows, so backing off frees less than the speed suggests")
+
+
+func test_usage_grows_as_the_car_approaches_the_limit() -> void:
+	var bend := 0.004
+	var slow := RacingLine.lateral_usage(bend, 40.0, 2.4, 47.8, 0.0003, 0.85)
+	var quick := RacingLine.lateral_usage(bend, 60.0, 2.4, 47.8, 0.0003, 0.85)
+	assert_lt(slow, quick)
+
+
+func test_the_circle_is_off_without_a_measured_grip_model() -> void:
+	assert_eq(RacingLine.lateral_usage(0.02, 60.0, 2.4, 0.0, 0.0, 1.0), 0.0,
+		"a line built from defaults keeps the old independent limits")
+
+
+func test_the_circle_makes_the_ideal_lap_honest_rather_than_faster() -> void:
+	var independent := RacingLine.from_curve(_curve, HALF_WIDTH)
+	independent.compute_speeds(2.4, 2.1, 0.93, 310.0, 0.0, 0.0, 1.0, 41.7)
+
+	var circled := RacingLine.from_curve(_curve, HALF_WIDTH)
+	circled.compute_speeds(2.4, 2.1, 0.93, 310.0, 47.8, 0.00031, 0.85, 41.7, 47.2)
+
+	assert_gt(circled.estimated_lap_seconds(), 0.0)
+	assert_lt(
+		RacingLine.longitudinal_share(
+			RacingLine.lateral_usage(0.006, 45.0, 2.4, 47.8, 0.00031, 0.85)
+		),
+		1.0,
+		"braking and throttle must give way to cornering where the line bends"
+	)
+
+
+func test_the_default_profile_survives_the_friction_circle() -> void:
+	var line := RacingLine.from_curve(_curve, HALF_WIDTH)
+	var defaults := line.speed_mps.duplicate()
+	line.compute_speeds()
+	for index: int in defaults.size():
+		assert_eq(line.speed_mps[index], defaults[index], "sample %d" % index)

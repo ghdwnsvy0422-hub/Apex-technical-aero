@@ -33,6 +33,7 @@ func _measure_every_setup() -> Dictionary:
 		envelopes[downforce_area] = envelope
 		Log.info(TAG, "downforce %.1f: %s" % [downforce_area, envelope.describe()])
 		Log.info(TAG, "downforce %.1f: %s" % [downforce_area, envelope.describe_grip()])
+		Log.info(TAG, "downforce %.1f: %s" % [downforce_area, envelope.describe_braking()])
 		Log.info(TAG, "downforce %.1f: %s" % [downforce_area, envelope.describe_drive()])
 	return envelopes
 

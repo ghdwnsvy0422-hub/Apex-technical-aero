@@ -57,7 +57,8 @@ func compute_speeds(
 	lateral_reference_speed_mps: float = 0.0,
 	aero_load_ratio: float = DEFAULT_AERO_LOAD_RATIO,
 	load_sensitivity: float = DEFAULT_LOAD_SENSITIVITY,
-	acceleration_reference_speed_mps: float = 0.0
+	acceleration_reference_speed_mps: float = 0.0,
+	braking_reference_speed_mps: float = 0.0
 ) -> void:
 	var count := points.size()
 	speed_mps.resize(count)
@@ -78,13 +79,24 @@ func compute_speeds(
 			var here := speed_mps[index]
 			var pull := acceleration_at_speed(
 				acceleration_g, acceleration_reference_speed_mps, here, top_speed
-			)
+			) * longitudinal_share(lateral_usage(
+				curvature[index], here, lateral_g,
+				lateral_reference_speed_mps, aero_load_ratio, load_sensitivity
+			))
 			speed_mps[ahead] = minf(speed_mps[ahead], _reachable(here, pull, step))
 		for reverse: int in count:
 			var index := count - 1 - reverse
 			var ahead := posmod(index + 1, count)
 			var step := points[index].distance_to(points[ahead])
-			speed_mps[index] = minf(speed_mps[index], _reachable(speed_mps[ahead], braking_g, step))
+			var entering := maxf(speed_mps[index], speed_mps[ahead])
+			var shed := grip_at_speed(
+				braking_g, braking_reference_speed_mps, entering,
+				aero_load_ratio, load_sensitivity
+			) * longitudinal_share(lateral_usage(
+				curvature[index], entering, lateral_g,
+				lateral_reference_speed_mps, aero_load_ratio, load_sensitivity
+			))
+			speed_mps[index] = minf(speed_mps[index], _reachable(speed_mps[ahead], shed, step))
 
 
 func index_for_offset(centreline_offset_m: float) -> int:
@@ -163,6 +175,29 @@ static func corner_speed(
 		if speed >= top_speed_mps:
 			return top_speed_mps
 	return minf(top_speed_mps, speed)
+
+
+static func lateral_usage(
+	bend: float,
+	speed_mps: float,
+	lateral_g: float,
+	reference_speed_mps: float,
+	aero_load_ratio: float,
+	load_sensitivity: float
+) -> float:
+	if reference_speed_mps <= 0.0 or bend < STRAIGHT_CURVATURE:
+		return 0.0
+	var available := grip_at_speed(
+		lateral_g, reference_speed_mps, speed_mps, aero_load_ratio, load_sensitivity
+	)
+	if available <= 0.0:
+		return 1.0
+	return clampf(speed_mps * speed_mps * bend / (available * GRAVITY), 0.0, 1.0)
+
+
+static func longitudinal_share(lateral_usage_fraction: float) -> float:
+	var spare := 1.0 - lateral_usage_fraction * lateral_usage_fraction
+	return sqrt(maxf(spare, 0.0))
 
 
 static func drive_shape(speed_mps: float, top_speed_mps: float) -> float:
