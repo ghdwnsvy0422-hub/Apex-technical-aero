@@ -107,3 +107,77 @@ func test_a_curve_without_points_produces_an_empty_line() -> void:
 	assert_eq(empty.points.size(), 0)
 	assert_eq(empty.speed_for_offset(10.0), 0.0)
 	assert_eq(empty.point_for_offset(10.0), Vector3.ZERO)
+
+
+func test_a_straight_is_taken_at_top_speed() -> void:
+	assert_eq(RacingLine.corner_speed(0.0, 2.2, 97.0), 97.0)
+
+
+func test_a_tighter_corner_is_taken_slower() -> void:
+	assert_lt(RacingLine.corner_speed(0.010, 2.2, 97.0), RacingLine.corner_speed(0.002, 2.2, 97.0))
+
+
+func test_without_aero_the_solve_is_the_plain_grip_formula() -> void:
+	var bend := 0.004
+	var plain := sqrt(2.2 * RacingLine.GRAVITY / bend)
+	assert_almost_eq(RacingLine.corner_speed(bend, 2.2, 500.0), plain, 0.0001)
+
+
+func test_the_solve_never_exceeds_the_top_speed_it_was_given() -> void:
+	for bend: float in [0.0, 0.0005, 0.002, 0.01, 0.05]:
+		assert_lte(RacingLine.corner_speed(bend, 2.6, 80.0, 47.8, 0.0003, 0.85), 80.0,
+			"curvature %.4f" % bend)
+
+
+func test_grip_is_unchanged_at_the_speed_it_was_measured() -> void:
+	assert_almost_eq(RacingLine.grip_at_speed(2.4, 47.8, 47.8, 0.0003, 0.85), 2.4, 0.0001)
+
+
+func test_grip_falls_below_the_skidpad_figure_in_a_slow_corner() -> void:
+	var slow := RacingLine.grip_at_speed(2.4, 47.8, 22.0, 0.0003, 0.85)
+	assert_lt(slow, 2.4, "the downforce that made 2.4 g is not there at 79 km/h")
+
+
+func test_grip_rises_above_the_skidpad_figure_in_a_fast_corner() -> void:
+	assert_gt(RacingLine.grip_at_speed(2.4, 47.8, 80.0, 0.0003, 0.85), 2.4)
+
+
+func test_a_car_without_downforce_keeps_one_grip_figure() -> void:
+	assert_eq(RacingLine.grip_at_speed(1.7, 47.8, 20.0, 0.0, 0.85), 1.7)
+	assert_eq(RacingLine.grip_at_speed(1.7, 47.8, 90.0, 0.0, 0.85), 1.7)
+
+
+func test_a_winged_car_is_asked_to_go_slower_through_a_slow_corner() -> void:
+	var tight := 0.020
+	var flat := RacingLine.corner_speed(tight, 2.4, 200.0)
+	var honest := RacingLine.corner_speed(tight, 2.4, 200.0, 47.8, 0.0003, 0.85)
+	assert_lt(honest, flat, "a constant lateral g promises grip the slow corner does not have")
+
+
+func test_a_winged_car_is_allowed_more_through_a_fast_corner() -> void:
+	var open_bend := 0.0015
+	var flat := RacingLine.corner_speed(open_bend, 2.4, 200.0)
+	var honest := RacingLine.corner_speed(open_bend, 2.4, 200.0, 47.8, 0.0003, 0.85)
+	assert_gt(honest, flat)
+
+
+func test_the_corner_speed_solve_settles() -> void:
+	var bend := 0.004
+	var solved := RacingLine.corner_speed(bend, 2.4, 200.0, 47.8, 0.0003, 0.85)
+	var available := RacingLine.grip_at_speed(2.4, 47.8, solved, 0.0003, 0.85)
+	assert_almost_eq(solved * solved * bend, available * RacingLine.GRAVITY, 0.05,
+		"the answer must be a speed the car can actually hold on that radius")
+
+
+func test_the_default_speed_profile_is_unchanged_by_the_new_parameters() -> void:
+	var line := RacingLine.from_curve(_curve, HALF_WIDTH)
+	var defaults := line.speed_mps.duplicate()
+
+	line.compute_speeds(
+		RacingLine.DEFAULT_LATERAL_G,
+		RacingLine.DEFAULT_BRAKING_G,
+		RacingLine.DEFAULT_ACCELERATION_G,
+		RacingLine.DEFAULT_TOP_SPEED_KPH
+	)
+	for index: int in defaults.size():
+		assert_eq(line.speed_mps[index], defaults[index], "sample %d" % index)

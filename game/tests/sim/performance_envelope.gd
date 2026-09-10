@@ -20,6 +20,9 @@ var top_speed_kph: float = 0.0
 var lateral_g: float = 0.0
 var braking_g: float = 0.0
 var acceleration_g: float = 0.0
+var lateral_reference_speed_mps: float = 0.0
+var aero_load_ratio: float = 0.0
+var load_sensitivity: float = RacingLine.DEFAULT_LOAD_SENSITIVITY
 
 
 static func measure(host: Node, setup: CarSetup) -> PerformanceEnvelope:
@@ -27,17 +30,46 @@ static func measure(host: Node, setup: CarSetup) -> PerformanceEnvelope:
 	envelope.top_speed_kph = await _measure_top_speed(host, setup)
 	envelope.acceleration_g = await _measure_acceleration(host, setup)
 	envelope.braking_g = await _measure_braking(host, setup)
-	envelope.lateral_g = await _measure_lateral(host, setup)
+
+	var skidpad := await _measure_lateral(host, setup, SKIDPAD_ENTRY_KPH)
+	envelope.lateral_g = sample_lateral_g(skidpad)
+	envelope.lateral_reference_speed_mps = sample_speed_mps(skidpad)
+	envelope.aero_load_ratio = Aero.load_ratio_per_speed_squared(setup, GRAVITY)
+	envelope.load_sensitivity = setup.load_sensitivity
 	return envelope
 
 
+static func sample_lateral_g(sample: Vector2) -> float:
+	return sample.x
+
+
+static func sample_speed_mps(sample: Vector2) -> float:
+	return sample.y
+
+
 func apply_to(line: RacingLine) -> void:
-	line.compute_speeds(lateral_g, braking_g, acceleration_g, top_speed_kph)
+	line.compute_speeds(
+		lateral_g, braking_g, acceleration_g, top_speed_kph,
+		lateral_reference_speed_mps, aero_load_ratio, load_sensitivity
+	)
+
+
+func lateral_g_at(speed_mps: float) -> float:
+	return RacingLine.grip_at_speed(
+		lateral_g, lateral_reference_speed_mps, speed_mps, aero_load_ratio, load_sensitivity
+	)
 
 
 func describe() -> String:
 	return "top %.0f km/h | lateral %.2f g | braking %.2f g | acceleration %.2f g" % [
 		top_speed_kph, lateral_g, braking_g, acceleration_g
+	]
+
+
+func describe_grip() -> String:
+	return "lateral %.2f g measured at %.0f km/h | %.2f g at 120 km/h | %.2f g at 280 km/h" % [
+		lateral_g, lateral_reference_speed_mps * 3.6,
+		lateral_g_at(120.0 / 3.6), lateral_g_at(280.0 / 3.6)
 	]
 
 
@@ -111,7 +143,7 @@ static func _measure_braking(host: Node, setup: CarSetup) -> float:
 	return shed / elapsed / GRAVITY
 
 
-static func _measure_lateral(host: Node, setup: CarSetup) -> float:
+static func _measure_lateral(host: Node, setup: CarSetup, entry_kph: float) -> Vector2:
 	var harness := _spawn(host, setup)
 	await harness.coast(TICK_RATE)
 
@@ -119,7 +151,7 @@ static func _measure_lateral(host: Node, setup: CarSetup) -> float:
 		var elapsed := float(tick) / TICK_RATE
 		harness.car.input = DriverInput.create(launch_throttle(elapsed), 0.0, 0.0)
 		await host.get_tree().physics_frame
-		if harness.car.speed_kph() >= SKIDPAD_ENTRY_KPH:
+		if harness.car.speed_kph() >= entry_kph:
 			break
 
 	var cornering := DriverInput.create(0.35, 0.0, 1.0)
@@ -129,18 +161,21 @@ static func _measure_lateral(host: Node, setup: CarSetup) -> float:
 	var heading := _heading(harness.car)
 	var samples := 0
 	var total := 0.0
+	var speed_total := 0.0
 	for _tick: int in int(SKIDPAD_MEASURE_S * TICK_RATE):
 		await host.get_tree().physics_frame
 		var now := _heading(harness.car)
 		var yaw_rate := absf(angle_difference(heading, now)) * TICK_RATE
 		heading = now
-		total += harness.car.linear_velocity.length() * yaw_rate
+		var speed := harness.car.linear_velocity.length()
+		total += speed * yaw_rate
+		speed_total += speed
 		samples += 1
 
 	_despawn(host, harness)
 	if samples == 0:
-		return RacingLine.DEFAULT_LATERAL_G
-	return total / float(samples) / GRAVITY
+		return Vector2(RacingLine.DEFAULT_LATERAL_G, entry_kph / 3.6)
+	return Vector2(total / float(samples) / GRAVITY, speed_total / float(samples))
 
 
 static func _heading(car: CarBody) -> float:

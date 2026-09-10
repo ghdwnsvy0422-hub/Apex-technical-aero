@@ -32,6 +32,7 @@ func _measure_every_setup() -> Dictionary:
 		var envelope: PerformanceEnvelope = await PerformanceEnvelope.measure(self, setup)
 		envelopes[downforce_area] = envelope
 		Log.info(TAG, "downforce %.1f: %s" % [downforce_area, envelope.describe()])
+		Log.info(TAG, "downforce %.1f: %s" % [downforce_area, envelope.describe_grip()])
 	return envelopes
 
 
@@ -138,6 +139,14 @@ func _quickest() -> Dictionary:
 	return best
 
 
+func _quickest_by_ideal() -> Dictionary:
+	var best: Dictionary = _rows[0]
+	for row: Dictionary in _rows:
+		if row["ideal_s"] < best["ideal_s"]:
+			best = row
+	return best
+
+
 func _check_tradeoff() -> void:
 	if _rows.size() < 2:
 		_check(false, "not enough setups measured to judge the trade-off")
@@ -157,29 +166,34 @@ func _check_tradeoff() -> void:
 			first["lateral_g"], last["lateral_g"]
 		]
 	)
+	_check_every_setup_completed()
 	_check_no_universal_setup()
 
 
+func _check_every_setup_completed() -> void:
+	var missing := _rows.size() - _finishers().size()
+	_check(missing == 0, "every measured setup completes a lap (%d did not)" % missing)
+
+
 func _check_no_universal_setup() -> void:
-	var finishers := _finishers()
-	if finishers.size() < 3:
-		_check(false, "only %d setup(s) completed a lap, too few to rank" % finishers.size())
+	if _rows.size() < 3:
+		_check(false, "only %d setup(s) measured, too few to rank" % _rows.size())
 		return
 
-	var quickest := _quickest()
-	var slowest := finishers[0]
-	for row: Dictionary in finishers:
-		if row["lap_s"] > slowest["lap_s"]:
+	var quickest := _quickest_by_ideal()
+	var slowest: Dictionary = _rows[0]
+	for row: Dictionary in _rows:
+		if row["ideal_s"] > slowest["ideal_s"]:
 			slowest = row
 
-	var spread: float = float(slowest["lap_s"]) - float(quickest["lap_s"])
-	Log.info(TAG, "quickest setup: downforce %.1f | %.3f s covers the setups that finished" % [
+	var spread: float = float(slowest["ideal_s"]) - float(quickest["ideal_s"])
+	Log.info(TAG, "quickest setup: downforce %.1f | %.3f s covers the setups on ideal pace" % [
 		quickest["downforce_area"], spread
 	])
 	_check(spread > 0.2, "the setups are not interchangeable (%.3f s separates them)" % spread)
 	_check(
-		quickest["downforce_area"] > float(finishers[0]["downforce_area"])
-			and quickest["downforce_area"] < float(finishers[finishers.size() - 1]["downforce_area"]),
+		quickest["downforce_area"] > float(_rows[0]["downforce_area"])
+			and quickest["downforce_area"] < float(_rows[_rows.size() - 1]["downforce_area"]),
 		"the quickest setup is an interior optimum rather than an extreme (downforce %.1f)"
 			% quickest["downforce_area"]
 	)

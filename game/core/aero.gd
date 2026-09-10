@@ -22,3 +22,10 @@ static func drag(speed: float, setup: CarSetup) -> float:
 
 static func downforce(speed: float, setup: CarSetup) -> float:
 	return dynamic_pressure(speed, setup.air_density) * setup.downforce_area
+
+
+static func load_ratio_per_speed_squared(setup: CarSetup, gravity: float) -> float:
+	var weight := setup.mass * gravity
+	if weight <= 0.0:
+		return 0.0
+	return 0.5 * setup.air_density * setup.downforce_area / weight

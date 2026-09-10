@@ -23,7 +23,13 @@ func envelope(top_kph: float, lateral: float, braking: float, acceleration: floa
 	measured.lateral_g = lateral
 	measured.braking_g = braking
 	measured.acceleration_g = acceleration
+	measured.lateral_reference_speed_mps = 0.0
+	measured.aero_load_ratio = 0.0
 	return measured
+
+
+func sample(lateral_g: float, speed_mps: float) -> Vector2:
+	return Vector2(lateral_g, speed_mps)
 
 
 func slowest_corner_kph(line: RacingLine) -> float:
@@ -86,3 +92,55 @@ func test_the_description_reports_every_measured_axis() -> void:
 	assert_string_contains(text, "2.41")
 	assert_string_contains(text, "2.11")
 	assert_string_contains(text, "0.93")
+
+
+func aero_envelope(top_kph: float, lateral: float, at_mps: float, ratio: float) -> PerformanceEnvelope:
+	var measured := envelope(top_kph, lateral, 2.0, 0.9)
+	measured.lateral_reference_speed_mps = at_mps
+	measured.aero_load_ratio = ratio
+	measured.load_sensitivity = 0.85
+	return measured
+
+
+func test_grip_is_reported_unchanged_at_the_speed_it_was_measured() -> void:
+	var measured := aero_envelope(320.0, 2.41, 47.8, 0.00031)
+	assert_almost_eq(measured.lateral_g_at(47.8), 2.41, 0.0001)
+
+
+func test_a_car_with_wings_has_less_grip_in_a_slow_corner_than_on_the_skidpad() -> void:
+	var measured := aero_envelope(320.0, 2.41, 47.8, 0.00031)
+	assert_lt(measured.lateral_g_at(25.0), 2.41,
+		"downforce measured at 172 km/h is not there at 90 km/h")
+	assert_gt(measured.lateral_g_at(80.0), 2.41)
+
+
+func test_a_wingless_car_has_the_same_grip_at_every_speed() -> void:
+	var measured := aero_envelope(320.0, 1.70, 47.8, 0.0)
+	assert_eq(measured.lateral_g_at(20.0), 1.70)
+	assert_eq(measured.lateral_g_at(90.0), 1.70)
+
+
+func test_more_wing_costs_more_grip_when_the_car_slows_down() -> void:
+	var little_wing := aero_envelope(340.0, 2.0, 47.8, 0.00016)
+	var big_wing := aero_envelope(280.0, 2.6, 47.8, 0.00047)
+	var slow := 25.0
+
+	assert_gt(big_wing.lateral_g_at(slow) / 2.6, 0.0)
+	assert_lt(
+		big_wing.lateral_g_at(slow) / big_wing.lateral_g,
+		little_wing.lateral_g_at(slow) / little_wing.lateral_g,
+		"the more a car leans on wings, the more of its grip it loses in slow corners"
+	)
+
+
+func test_the_speed_profile_asks_less_of_a_winged_car_in_slow_corners() -> void:
+	var flat := fresh_line()
+	envelope(320.0, 2.41, 2.0, 0.9).apply_to(flat)
+
+	var honest := fresh_line()
+	aero_envelope(320.0, 2.41, 47.8, 0.00031).apply_to(honest)
+
+	var slowest_flat := slowest_corner_kph(flat)
+	var slowest_honest := slowest_corner_kph(honest)
+	assert_lt(slowest_honest, slowest_flat,
+		"a constant lateral g overstates what the car can do in the slowest corner")

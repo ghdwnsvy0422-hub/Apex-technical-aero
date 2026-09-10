@@ -10,6 +10,10 @@ const DEFAULT_LATERAL_G: float = 2.2
 const DEFAULT_BRAKING_G: float = 2.0
 const DEFAULT_ACCELERATION_G: float = 0.55
 const DEFAULT_TOP_SPEED_KPH: float = 350.0
+const DEFAULT_AERO_LOAD_RATIO: float = 0.0
+const DEFAULT_LOAD_SENSITIVITY: float = 1.0
+const STRAIGHT_CURVATURE: float = 0.000001
+const CORNER_SPEED_PASSES: int = 60
 const GRAVITY: float = 9.8
 
 var points: Array[Vector3] = []
@@ -49,7 +53,10 @@ func compute_speeds(
 	lateral_g: float = DEFAULT_LATERAL_G,
 	braking_g: float = DEFAULT_BRAKING_G,
 	acceleration_g: float = DEFAULT_ACCELERATION_G,
-	top_speed_kph: float = DEFAULT_TOP_SPEED_KPH
+	top_speed_kph: float = DEFAULT_TOP_SPEED_KPH,
+	lateral_reference_speed_mps: float = 0.0,
+	aero_load_ratio: float = DEFAULT_AERO_LOAD_RATIO,
+	load_sensitivity: float = DEFAULT_LOAD_SENSITIVITY
 ) -> void:
 	var count := points.size()
 	speed_mps.resize(count)
@@ -58,11 +65,10 @@ func compute_speeds(
 
 	var top_speed := top_speed_kph / 3.6
 	for index: int in count:
-		var bend := curvature[index]
-		if bend < 0.000001:
-			speed_mps[index] = top_speed
-		else:
-			speed_mps[index] = minf(top_speed, sqrt(lateral_g * GRAVITY / bend))
+		speed_mps[index] = corner_speed(
+			curvature[index], lateral_g, top_speed,
+			lateral_reference_speed_mps, aero_load_ratio, load_sensitivity
+		)
 
 	for _lap: int in 2:
 		for index: int in count:
@@ -117,6 +123,43 @@ func estimated_lap_seconds() -> float:
 		var step := points[index].distance_to(points[posmod(index + 1, points.size())])
 		total += step / maxf(speed_mps[index], 1.0)
 	return total
+
+
+static func grip_at_speed(
+	reference_g: float,
+	reference_speed_mps: float,
+	speed_mps: float,
+	aero_load_ratio: float,
+	load_sensitivity: float
+) -> float:
+	if aero_load_ratio <= 0.0 or reference_speed_mps <= 0.0:
+		return reference_g
+	var load_here := 1.0 + aero_load_ratio * speed_mps * speed_mps
+	var load_measured := 1.0 + aero_load_ratio * reference_speed_mps * reference_speed_mps
+	return reference_g * pow(load_here / load_measured, load_sensitivity)
+
+
+static func corner_speed(
+	bend: float,
+	lateral_g: float,
+	top_speed_mps: float,
+	reference_speed_mps: float = 0.0,
+	aero_load_ratio: float = DEFAULT_AERO_LOAD_RATIO,
+	load_sensitivity: float = DEFAULT_LOAD_SENSITIVITY
+) -> float:
+	if bend < STRAIGHT_CURVATURE:
+		return top_speed_mps
+
+	var speed := sqrt(lateral_g * GRAVITY / bend)
+	for _pass: int in CORNER_SPEED_PASSES:
+		var available := grip_at_speed(
+			lateral_g, reference_speed_mps, minf(speed, top_speed_mps),
+			aero_load_ratio, load_sensitivity
+		)
+		speed = sqrt(available * GRAVITY / bend)
+		if speed >= top_speed_mps:
+			return top_speed_mps
+	return minf(top_speed_mps, speed)
 
 
 static func menger_curvature(first: Vector3, second: Vector3, third: Vector3) -> float:
