@@ -18,6 +18,7 @@
 
 - Stage 0.1~0.3과 Phase 1.1~1.7이 구현되어 있고 자동 검증을 통과한다.
 - 남은 것은 1.8이며, 사람이 직접 몰아본 판정이 필요하다. 이 판정 전에는 Phase 2 이후를 시작하지 않는다.
+- 2026-11-11 세션에서 전체 분석(§10, §12), Stage 0.1 감사(§13), Jolt 경고 규명(B1), AI 드라이버 슬립 관리(R3), CI 결과 확인(R8)을 했다. Phase 1.8은 진행하지 않았다.
 - 근거: `handoff.md` §2, §10 및 아래 §2의 `check.sh` 통과.
 
 ## 2. 마지막 검증
@@ -25,21 +26,36 @@
 | 항목 | 내용 |
 |---|---|
 | 일시 | 2026-11-11 |
-| 기준 커밋 | `7b3d7bf` (origin/main HEAD) |
-| 환경 | 클라우드 컨테이너, 디스플레이 없음, Godot 4.4.stable.official.4c311cbee (`./tools/install_godot.sh`로 설치) |
-| 명령 | `./tools/check.sh` |
-| 결과 | **통과** (종료 코드 0, 소요 약 28초) |
-| GUT 단위 테스트 | 13 스크립트, 173 테스트 전부 통과, 1430 assert |
+| 기준 커밋 | 코드는 `e383fd8`(브랜치 `claude/tender-fermi-xszs0k`). 이후 커밋은 문서만 바꿨다 |
+| 환경 | 클라우드 컨테이너(4코어), 디스플레이 없음, Godot 4.4.stable.official.4c311cbee (`./tools/install_godot.sh`로 설치) |
+| 명령 | `./tools/check.sh` (세션 마지막에 처음부터 끝까지 실행) |
+| 결과 | **통과** (종료 코드 0, 소요 약 30초) |
+| GUT 단위 테스트 | 13 스크립트, **184** 테스트 전부 통과, 1449 assert (세션 시작 시 173 / 1430. `test_ai_driver.gd`에 11개 추가) |
 | 환경 자가 검증 | 통과 (Jolt, 120Hz, 데이터 로드: 부품 12, 티어 7, 컴파운드 3, 트랙 1) |
-| 물리 프로브 | 28개 PASS. 0-100 km/h 4.13 s, 0-200 km/h 7.17 s, 218 km/h에서 제동 평균 2.1 g, 최고속 350 km/h(저다운포스) / 280 km/h(고다운포스), 노면 그립 road 1.00 / runoff 0.55 |
-| AI 랩타임 회귀 | 통과. Aurora 플라잉 랩 1:04.467, 기준값 1:04.467, 편차 0.000 s. 이론 랩 1:01.363 |
-| 클라이언트 헤드리스 부팅 | `./tools/godot.sh --headless --path game --quit-after 120` 정상 부팅(`Client boot`, `TestDrive: Ready`) |
-| 전용 서버 모드 | `./tools/godot.sh --headless --path game -- --server --port=27015` 부팅 로그(`mode=DEDICATED_SERVER`, `Dedicated server boot (port 27015)`)만 확인. 네트워킹은 없음 |
-| 실행하지 않은 것 | `./tools/sweep.sh`(수 분 소요), `./tools/screenshot.sh`, 사람이 직접 주행, GitHub Actions 결과 |
+| 물리 프로브 | 28개 PASS(변화 없음). 0-100 km/h 4.13 s, 0-200 km/h 7.17 s, 218 km/h에서 제동 평균 2.1 g, 최고속 350 km/h(저다운포스) / 280 km/h(고다운포스), 노면 그립 road 1.00 / runoff 0.55 |
+| AI 랩타임 회귀 | 통과(5개 PASS). Aurora 랩 1 1:09.558, 플라잉 랩 1:04.467, 기준값 1:04.467, 편차 −0.000 s. 기준값은 옮기지 않았다 |
+| 파라미터 스윕 | `./tools/sweep.sh` 2회 실행(변경 전 84초, 변경 후 65초), 둘 다 종료 코드 0. 아래 표 |
+| 클라이언트 헤드리스 부팅 | `./tools/godot.sh --headless --path game --quit-after 120` 정상 부팅(`Client boot`, `TestDrive: Ready (autopilot=false)`) |
+| 전용 서버 모드 | `timeout 10 ./tools/godot.sh --headless --path game -- --server --port=27015` 부팅 로그(`mode=DEDICATED_SERVER`, `Dedicated server boot (port 27015)`)만 확인. 네트워킹은 없음 |
+| GitHub Actions | `main` 최근 실행 성공, 작업 브랜치는 실행 없음(R8) |
+| 실행하지 않은 것 | `./tools/screenshot.sh`(시각적 변경 없음), 사람이 직접 주행, 디스플레이가 있는 환경에서의 클라이언트 실행, 실제 키보드/패드 입력 |
+
+스윕 전후 (2026-11-11, `driven lap`은 플라잉 랩, 커밋 `e383fd8` 전후):
+
+| 다운포스 | 최고속 | 횡G | ideal lap | driven 이전 | driven 이후 | 이후 − ideal |
+|---|---|---|---|---|---|---|
+| 2.0 | 339 km/h | 1.91 g | 1:01.306 | DNF (0랩) | 1:04.800 | +3.494 s |
+| 3.0 | 317 km/h | 2.30 g | 0:58.336 | 1:08.675 | 1:02.192 | +3.856 s |
+| 4.0 | 310 km/h | 2.41 g | 0:57.651 | 1:01.642 | 1:01.642 | +3.991 s |
+| 5.0 | 295 km/h | 2.54 g | 0:57.452 | 1:01.475 | 1:01.475 | +4.023 s |
+| 6.0 | 280 km/h | 2.65 g | 0:58.011 | 1:01.917 | 1:01.917 | +3.906 s |
+
+- 4.0/5.0/6.0은 밀리초까지 같다. 최속 세팅은 여전히 5.0(내부 최적), 스윕의 PRD §27 검사 4건 통과.
+- 2.0은 완주한다. 3.0은 6.483초 빨라졌지만 "ideal +3.0초 이내" 목표에는 0.856초 모자란다. 원인은 드라이버가 아니라 ideal 계산이다(R13, `handoff.md` §6.19).
 
 관찰된 경고:
 
-- 물리 프로브 중 `Jolt Physics job system exceeded the maximum number of jobs` 경고가 실행에 따라 0~1회 출력된다. 하네스의 스텝 속도가 원인이고 결과에 영향이 없다(§6 B1, `handoff.md` §6.18).
+- `Jolt Physics job system exceeded the maximum number of jobs` 경고가 실행에 따라 물리 프로브에서 0~1회, 드물게 랩타임 회귀에서도 나온다(마지막 실행에서는 각 1회). 하네스의 스텝 속도가 원인이고 결과에 영향이 없다(§6 B1, `handoff.md` §6.18).
 - GUT 요약에 `Total orphans = 18`이 출력된다. `handoff.md` §6.13에 따르면 GUT 자체 객체가 섞인 값이며 누수 감시는 `assert_no_new_orphans()`로 한다.
 
 ## 3. 작업 현황 (제작 계획 작업 번호 기준)
@@ -47,7 +63,7 @@
 | 작업 | 상태 | 근거 / 비고 |
 |---|---|---|
 | Stage 0.1 프로젝트 골격 | 완료 | 2026-11-11 `STAGE_0_1_PROMPT` 감사 수행. 체크리스트 A~E 전 항목 일치, 갭 없음, 코드 변경 없음. 결과는 §13 |
-| Stage 0.2 검증 게이트(GUT + CI) | 완료 | `tools/check.sh` 통과. CI 워크플로(`.github/workflows/ci.yml`)는 `push: main`과 `pull_request`에서만 돈다. 실행 결과는 R8 참조 |
+| Stage 0.2 검증 게이트(GUT + CI) | 완료 | `tools/check.sh` 통과. CI는 `main`에서 성공 확인(R8). 워크플로는 `push: main`과 `pull_request`에서만 돈다 |
 | Stage 0.3 데이터 스키마 + 검증 로더 | 완료 | `DataRegistry` 부팅 검증 통과, `test_data_registry.gd` 통과 |
 | Phase 1.1 차량 물리 코어 | 완료(자동 검증 범위) | `RigidBody3D` + 레이캐스트 서스펜션 + 슬립 기반 타이어. 프로브 통과. 조종감은 미판정 |
 | Phase 1.2 입력 / 카메라 / 주행 씬 | 완료(자동 검증 범위) | `test_player_input.gd` 통과. 실제 키보드/패드 조작은 미확인 |
@@ -77,7 +93,7 @@
 
 | # | 내용 | 상태 | 비고 |
 |---|---|---|---|
-| B1 | 물리 프로브 실행 중 Jolt 경고 `job system exceeded the maximum number of jobs` | 원인 규명, 수정 안 함 | 하네스가 물리 스텝을 실시간보다 훨씬 빠르게(초당 약 3400스텝) 연달아 돌릴 때만 나온다. 프로브 `--fixed-fps 30` 7/10, `--fixed-fps 120` 8/10, 랩타임 회귀 0/4, 클라이언트 헤드리스 0/5, `--autopilot` 0/3. 결과 수치는 경고 유무와 무관하게 동일. 상세와 고치지 않은 이유는 `handoff.md` §6.18 |
+| B1 | 물리 프로브 실행 중 Jolt 경고 `job system exceeded the maximum number of jobs` | 원인 규명, 수정 안 함 | 하네스가 물리 스텝을 실시간보다 훨씬 빠르게(초당 약 3400스텝) 연달아 돌릴 때만 나온다. 프로브 `--fixed-fps 30` 7/10, `--fixed-fps 120` 8/10, 랩타임 회귀 1/7, 클라이언트 헤드리스 0/5, `--autopilot` 0/3. 결과 수치는 경고 유무와 무관하게 동일. 상세와 고치지 않은 이유는 `handoff.md` §6.18 |
 | B2 | 기존 코드에 주석이 많다. `CLAUDE.md`의 주석 금지 규칙은 `40dc384`에서 추가되었고 이전에 작성된 파일은 그대로다. `game/` 내 `.gd` 46개 중 33개(grep 기준)와 `tools/*.sh` 5개 전부, `tiers.json`/`parts.json`의 `_comment` 필드에서 확인 | 미결 | 일괄 삭제는 범위 밖 변경이므로 하지 않음. 삭제 여부는 사용자 결정 필요 |
 | B3 | `handoff.md` §5가 "같은 GDScript 물리를 돌리므로 서버 권위 판정이 구조적으로 공짜"라고 적고 있다. 동일 코드가 동일 결과를 보장하지 않으므로(`CLAUDE.md` 기술적 제약) 과대 표현이다 | 미결 | `handoff.md`는 이번 문서 작업 범위 밖이라 수정하지 않음 |
 | B5 | 문서 간 불일치(코드 변경 불필요, 문서만 해당). (1) `handoff.md` §2 "이론 랩타임 약 58초" ↔ 같은 문서와 `lap_probe` 출력의 1:01.363. (2) `handoff.md` §7 "모든 작업은 `main`에 커밋/푸시" ↔ `CLAUDE.md` Git 절(브랜치 지정 우선). (3) `handoff.md` §8 디렉터리 목록에 `docs/prompts`, `DEVELOPMENT_STATUS` 없음. (4) `PRODUCTION_PLAN` A-2 구조에 `game/ai`, `game/client` 없음(`CLAUDE.md`에는 있음). (5) `PRODUCTION_PLAN` A-1 "클라/서버 물리 불일치가 구조적으로 발생하지 않는다" ↔ `CLAUDE.md` 기술적 제약(B3과 같은 성격). (6) `PRODUCTION_PLAN` Phase 3 게이트의 "(§7 검증)"은 문맥상 §27. (7) `PRODUCTION_PLAN` 1.5 "체크포인트 통과 판정" ↔ 구현은 센터라인 오프셋 기반(`handoff.md` §6.11에 사유 기재). (8) `PRODUCTION_PLAN` B-1 DSL 예시(`{"straight": 850}`, `drs_zones`) ↔ 실제 형식(`{"kind": "straight", "length_m": 850}`, `pit` 객체). (9) `main.gd` 상단 독스트링 "Stage 0.1 has no gameplay scenes yet"는 낡은 기존 주석 | 미결 | `handoff.md`, `PRODUCTION_PLAN.md`는 수정 금지/승인 대상이라 기록만 함 |
@@ -97,7 +113,7 @@
 | R5 | 서버/클라 물리 동일 코드의 결과 일치 미보장, 클라 예측·되감기 재조정 가능 여부 미검증 | Phase 2 전체. 억울한 충돌 방지(PRD §90) | Phase 2.1에서 별도 검증 |
 | R6 | 랩 판정이 센터라인 근접 거리 기반이라 피트레인 도입 시 전제가 깨짐 | Phase 4.5 | `handoff.md` §6.11 |
 | R7 | 랩타임 기준값(`BASELINE_LAP_S`)이 현재 차량 세팅에 묶임 | 의도적 물리 변경 시 사유 없이 옮기면 게이트 무력화 | `CLAUDE.md` 검증 절 |
-| R8 | CI 실제 실행 결과 미확인 | 원격 게이트 신뢰성 | GitHub Actions 확인 필요 |
+| R8 | CI 실행 결과 | **확인함.** `main`의 최근 실행은 #16(`7b3d7bf`, push, 2026-09-10) 성공이고 `Run checks` 단계가 27초에 통과했다. `main`의 이전 실행 #15도 성공. 작업 브랜치 `claude/tender-fermi-xszs0k`는 실행이 0건이다(워크플로가 `push: main`과 `pull_request`에서만 돌고 이 브랜치에는 PR이 없다) | 2026-11-11 GitHub Actions 조회. 이 브랜치의 변경은 CI에서 검증된 적이 없다 |
 | R9 | 8인 서버 물리 부하 미측정 | Phase 2.7 | |
 | R10 | 차량 상태가 직렬화/복원 단위로 묶여 있지 않다. 재현에 필요한 상태는 `RigidBody3D` 변환·선속도·각속도, `CarBody.gear`/`engine_rpm`/`_shift_timer`/`_shift_cooldown`, 바퀴 4개의 `angular_velocity`다. `teleport_to()`는 초기화만 하고 임의 상태 복원 API는 없다. Jolt 내부 상태(접촉 캐시)는 GDScript에서 저장할 수 없다 | Phase 2.1 클라 예측/재조정. 되감기 재시뮬레이션 가능 여부가 미결인 이유 | 근거: `core/car_body.gd`, `core/wheel.gd`. 입력은 `DriverInput` 값으로 주입되고 난수는 쓰지 않는다(`grep` 0건) |
 | R11 | 물리 스텝이 씬 트리의 `_physics_process`와 Jolt 전역 스텝에 묶여 있어 차 한 대만 따로 N틱 재시뮬레이션할 수 없다(`PhysicsServer3D` 수동 스텝 미사용) | Phase 2.1. 서버 재조정 방식 선택을 제약 | 추측 아님: `CarBody._physics_process`가 `apply_force` 후 엔진 스텝에 맡김. 대안 비교는 2.1의 아키텍처 검토에서 수행 |
@@ -130,6 +146,10 @@
 
 - B2: 기존 주석 일괄 삭제 여부
 - B3: `handoff.md` §5 표현 수정 여부
+- R13/B6: 이론 랩 계산을 고칠지(랩타임 기준값 이동 수반). §8의 2번
+- B8: 열린 PR #2(병행 구현)를 닫을지, 일부를 가져올지
+- 이 브랜치(`claude/tender-fermi-xszs0k`)를 `main`에 병합할 시점. 병합 전에는 CI가 돌지 않는다
+- B5: `handoff.md`, `PRODUCTION_PLAN.md`의 문서 불일치를 고칠지
 - 정지 풀스로틀 휠스핀에 대한 플레이어 보조 제공 여부(R2)
 - PRD §51 DRS 계열, §52 에너지 존: PRD에서 "슬립스트림 테스트 후 결정"으로 미확정
 
@@ -208,10 +228,11 @@ PRD에 있으나 제작 계획에 대응 작업이 없는 것: §36 역주행 �
 | 일자 | 내용 |
 |---|---|
 | 2026-11-11 | 최초 작성. `origin/main` `7b3d7bf` 기준으로 저장소를 조사하고 `check.sh`를 실행해 기록함 |
-| 2026-11-11 | R3: AI 드라이버에 슬립 관리 추가(`e383fd8`). 스윕 전후 표를 §2에 기록. 조건 2(3.0이 ideal +3.0초 이내)는 미달 |
-| 2026-11-11 | B1 Jolt 경고 원인 규명(`handoff.md` §6.18). 코드 변경 없음 |
-| 2026-11-11 | `STAGE_0_1_PROMPT` 실행: 체크리스트 A~E 전 항목 일치, 갭 없음, 코드 변경 없음(§13) |
 | 2026-11-11 | `MASTER_PROMPT` 실행: §10 요구사항 추적 작성, §12 구조와 의존성 추가, §6에 B5~B8, §7에 R10~R13 추가, §8 실행 계획 수립. 기준선 `check.sh`(173 테스트, 프로브 28, 랩 1:04.467)와 `sweep.sh`(§6.17 표와 일치)를 실행함 |
+| 2026-11-11 | `STAGE_0_1_PROMPT` 실행: 체크리스트 A~E 전 항목 일치, 갭 없음, 코드 변경 없음(§13) |
+| 2026-11-11 | B1 Jolt 경고 원인 규명(`handoff.md` §6.18). 코드 변경 없음 |
+| 2026-11-11 | R3: AI 드라이버에 슬립 관리 추가(`e383fd8`). 스윕 전후 표를 §2에 기록. 조건 2(3.0이 ideal +3.0초 이내)는 미달 |
+| 2026-11-11 | 마무리: R8 CI 결과 확인(`main` 성공, 작업 브랜치 실행 없음), 최종 `check.sh` 통과(184 테스트, 프로브 28, 랩 1:04.467), §1·§2·§9 갱신 |
 
 ## 12. 구조와 의존성 (2026-11-11 조사)
 
