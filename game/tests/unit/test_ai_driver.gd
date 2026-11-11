@@ -118,3 +118,83 @@ func test_the_driver_asks_for_a_sane_input_everywhere_on_the_lap() -> void:
 		assert_between(input.brake, 0.0, 1.0, "brake at %.0f m" % offset)
 		assert_eq(input.throttle * input.brake, 0.0, "no braking on the throttle at %.0f m" % offset)
 		offset += 50.0
+
+
+func travelling(heading_offset_rad: float, speed: float) -> Vector3:
+	return (Vector3.FORWARD * speed).rotated(Vector3.UP, heading_offset_rad)
+
+
+func test_a_car_travelling_where_it_points_has_no_sideslip() -> void:
+	assert_almost_eq(AiDriver.sideslip(facing_forward(), travelling(0.0, 50.0)), 0.0, 0.0001)
+
+
+func test_sideslip_is_the_angle_between_the_nose_and_the_direction_of_travel() -> void:
+	var one_way := AiDriver.sideslip(facing_forward(), travelling(0.1, 50.0))
+	var other_way := AiDriver.sideslip(facing_forward(), travelling(-0.1, 50.0))
+	assert_almost_eq(absf(one_way), 0.1, 0.0001)
+	assert_almost_eq(one_way, -other_way, 0.0001, "sliding left and right mirror each other")
+
+
+func test_sideslip_follows_the_car_rather_than_the_world() -> void:
+	var turned := Transform3D(Basis(Vector3.UP, 0.7), Vector3.ZERO)
+	assert_almost_eq(AiDriver.sideslip(turned, travelling(0.7, 50.0)), 0.0, 0.0001)
+
+
+func test_sideslip_is_ignored_at_a_crawl() -> void:
+	var crawl := AiDriver.SIDESLIP_MIN_SPEED_MPS * 0.5
+	assert_eq(AiDriver.sideslip(facing_forward(), travelling(1.2, crawl)), 0.0)
+
+
+func test_vertical_speed_does_not_leak_into_sideslip() -> void:
+	var bouncing := travelling(0.0, 50.0) + Vector3.UP * 20.0
+	assert_almost_eq(AiDriver.sideslip(facing_forward(), bouncing), 0.0, 0.0001)
+
+
+func test_a_car_that_is_not_sliding_keeps_its_full_throttle() -> void:
+	assert_eq(AiDriver.slide_throttle_limit(0.0), 1.0)
+	assert_eq(AiDriver.slide_throttle_limit(AiDriver.SLIDE_ONSET_RAD), 1.0)
+	assert_eq(AiDriver.slide_throttle_limit(-AiDriver.SLIDE_ONSET_RAD), 1.0)
+
+
+func test_a_slide_takes_the_throttle_away_progressively() -> void:
+	var midway := (AiDriver.SLIDE_ONSET_RAD + AiDriver.SLIDE_LIMIT_RAD) * 0.5
+	var early := AiDriver.slide_throttle_limit(lerpf(AiDriver.SLIDE_ONSET_RAD, midway, 0.5))
+	var late := AiDriver.slide_throttle_limit(lerpf(midway, AiDriver.SLIDE_LIMIT_RAD, 0.5))
+	assert_between(early, 0.0, 1.0)
+	assert_lt(late, early, "the further the tail is out, the less throttle is left")
+	assert_eq(AiDriver.slide_throttle_limit(AiDriver.SLIDE_LIMIT_RAD), 0.0)
+	assert_eq(AiDriver.slide_throttle_limit(1.5), 0.0, "a spin gets no throttle at all")
+
+
+func test_the_slide_limit_treats_both_directions_alike() -> void:
+	var midway := (AiDriver.SLIDE_ONSET_RAD + AiDriver.SLIDE_LIMIT_RAD) * 0.5
+	assert_eq(AiDriver.slide_throttle_limit(midway), AiDriver.slide_throttle_limit(-midway))
+
+
+func test_the_grip_the_healthy_setups_corner_at_is_below_the_slide_onset() -> void:
+	assert_gt(AiDriver.SLIDE_ONSET_RAD, deg_to_rad(2.5), "they peak near 2.3 degrees of sideslip")
+
+
+func test_the_driver_lifts_when_the_tail_steps_out_below_the_target_speed() -> void:
+	var offset := 300.0
+	var frame := TrackGeometry.frame_at(_curve, offset, _line.centreline_length_m)
+	var slow := _line.speed_for_offset(offset) * 0.5
+	var nose := frame.basis * Vector3.FORWARD
+
+	var planted := _driver.input_for(frame, nose * slow)
+	var sliding := _driver.input_for(frame, nose.rotated(Vector3.UP, 0.2) * slow)
+
+	assert_gt(planted.throttle, 0.0, "below the target speed it wants to accelerate")
+	assert_eq(sliding.throttle, 0.0, "but not while the car is sideways")
+
+
+func test_a_slide_does_not_stop_the_driver_braking() -> void:
+	var offset := 300.0
+	var frame := TrackGeometry.frame_at(_curve, offset, _line.centreline_length_m)
+	var fast := _line.speed_for_offset(offset) * 1.5
+	var nose := frame.basis * Vector3.FORWARD
+
+	var sliding := _driver.input_for(frame, nose.rotated(Vector3.UP, 0.2) * fast)
+
+	assert_gt(sliding.brake, 0.0)
+	assert_eq(sliding.throttle, 0.0)

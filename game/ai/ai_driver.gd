@@ -14,6 +14,10 @@ const BRAKE_GAIN: float = 0.22
 const TRACTION_FLOOR_THROTTLE: float = 0.28
 const TRACTION_RAMP_MPS: float = 16.0
 
+const SIDESLIP_MIN_SPEED_MPS: float = 5.0
+const SLIDE_ONSET_RAD: float = 0.052
+const SLIDE_LIMIT_RAD: float = 0.079
+
 var line: RacingLine
 var curve: Curve3D
 
@@ -43,8 +47,10 @@ func input_for(car_transform: Transform3D, velocity: Vector3) -> DriverInput:
 	var offset := centreline_offset(car_transform.origin)
 	var target_speed := line.speed_for_offset(offset + speed * SPEED_PREVIEW_SECONDS)
 
+	var slide := sideslip(car_transform, velocity)
+
 	return DriverInput.create(
-		throttle_for(speed, target_speed),
+		minf(throttle_for(speed, target_speed), slide_throttle_limit(slide)),
 		brake_for(speed, target_speed),
 		steer_towards_line(car_transform, offset, speed)
 	)
@@ -87,3 +93,18 @@ static func brake_for(speed: float, target_speed: float) -> float:
 
 static func traction_limit(speed: float) -> float:
 	return clampf(TRACTION_FLOOR_THROTTLE + speed / TRACTION_RAMP_MPS, 0.0, 1.0)
+
+
+static func sideslip(car_transform: Transform3D, velocity: Vector3) -> float:
+	var travel := Vector3(velocity.x, 0.0, velocity.z)
+	if travel.length() < SIDESLIP_MIN_SPEED_MPS:
+		return 0.0
+	var forward := car_transform.basis * Vector3.FORWARD
+	forward.y = 0.0
+	if forward.length_squared() < 0.000001:
+		return 0.0
+	return forward.signed_angle_to(travel, Vector3.UP)
+
+
+static func slide_throttle_limit(sideslip_rad: float) -> float:
+	return 1.0 - smoothstep(SLIDE_ONSET_RAD, SLIDE_LIMIT_RAD, absf(sideslip_rad))
