@@ -26,6 +26,9 @@ const LOW_SPEED_REFERENCE: float = 2.0
 ## typical static corner load so a car at rest sits at its rated grip.
 const REFERENCE_LOAD: float = 2000.0
 
+const MIN_SLIP_SPEED: float = 0.001
+const LOW_SPEED_ARREST_SHARE: float = 0.5
+
 
 static func magic_formula(slip: float, b: float, c: float, e: float) -> float:
 	var scaled := b * slip
@@ -69,3 +72,24 @@ static func slip_ratio(contact_speed: float, ground_speed: float) -> float:
 
 static func slip_angle(lateral_speed: float, longitudinal_speed: float) -> float:
 	return atan2(-lateral_speed, maxf(absf(longitudinal_speed), LOW_SPEED_REFERENCE))
+
+
+static func slip_stiffness(longitudinal_force: float, slip_speed: float) -> float:
+	if absf(slip_speed) < MIN_SLIP_SPEED:
+		return 0.0
+	return maxf(longitudinal_force / slip_speed, 0.0)
+
+
+static func force_after_spin(
+	stale_force: float, stale_slip_speed: float, slip_speed: float, available: float
+) -> float:
+	if absf(stale_slip_speed) < MIN_SLIP_SPEED:
+		return clampf(stale_force, -available, available)
+	return clampf(stale_force * slip_speed / stale_slip_speed, -available, available)
+
+
+static func arrested(force: float, sliding_speed: float, carried_mass: float, delta: float) -> float:
+	if delta <= 0.0:
+		return force
+	var stopping_force := carried_mass * absf(sliding_speed) / delta
+	return clampf(force, -stopping_force, stopping_force)

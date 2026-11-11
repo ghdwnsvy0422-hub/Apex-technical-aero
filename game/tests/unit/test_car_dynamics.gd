@@ -122,3 +122,84 @@ func test_four_wheels_are_placed_symmetrically() -> void:
 	assert_eq(offsets.size(), 4)
 	assert_almost_eq(offsets[0].x, -offsets[1].x, 0.001)
 	assert_almost_eq(offsets[2].x, -offsets[3].x, 0.001)
+
+
+func test_a_gripping_tyre_holds_the_wheel_back_within_the_tick() -> void:
+	var free := Wheel.create(Vector3.ZERO, false, true)
+	free.integrate_spin(500.0, 0.0, 0.0, 2.0, _setup, 0.01)
+
+	var gripping := Wheel.create(Vector3.ZERO, false, true)
+	gripping.integrate_spin(500.0, 0.0, 0.0, 2.0, _setup, 0.01, 20000.0)
+
+	assert_gt(gripping.angular_velocity, 0.0)
+	assert_lt(gripping.angular_velocity, free.angular_velocity)
+
+
+func test_a_stiff_tyre_brings_a_wheel_to_road_speed_without_overshooting() -> void:
+	var wheel := Wheel.create(Vector3.ZERO, true, false)
+	var road_speed := 3.0
+	wheel.angular_velocity = (road_speed + 1.0) / _setup.wheel_radius
+	var stiffness := 48000.0
+	for _tick: int in 240:
+		var slip_speed := wheel.surface_speed(_setup.wheel_radius) - road_speed
+		wheel.integrate_spin(
+			0.0, 0.0, stiffness * slip_speed, _setup.wheel_inertia(), _setup, 1.0 / 120.0, stiffness
+		)
+		assert_gte(
+			wheel.surface_speed(_setup.wheel_radius), road_speed - 0.0001,
+			"an undriven wheel never swings past the road speed"
+		)
+	assert_almost_eq(wheel.surface_speed(_setup.wheel_radius), road_speed, 0.001)
+
+
+func test_the_same_wheel_without_that_help_overshoots() -> void:
+	var wheel := Wheel.create(Vector3.ZERO, true, false)
+	var road_speed := 3.0
+	wheel.angular_velocity = (road_speed + 1.0) / _setup.wheel_radius
+	var stiffness := 48000.0
+	var slip_speed := wheel.surface_speed(_setup.wheel_radius) - road_speed
+	wheel.integrate_spin(0.0, 0.0, stiffness * slip_speed, _setup.wheel_inertia(), _setup, 1.0 / 120.0)
+	assert_lt(wheel.surface_speed(_setup.wheel_radius), road_speed,
+		"which is the chatter this guards against")
+
+
+func test_negative_slip_stiffness_is_ignored() -> void:
+	var plain := Wheel.create(Vector3.ZERO, false, true)
+	plain.integrate_spin(500.0, 0.0, 0.0, 2.0, _setup, 0.01)
+	var odd := Wheel.create(Vector3.ZERO, false, true)
+	odd.integrate_spin(500.0, 0.0, 0.0, 2.0, _setup, 0.01, -9000.0)
+	assert_eq(odd.angular_velocity, plain.angular_velocity)
+
+
+func test_roll_inertia_comes_from_the_track_width_not_the_narrow_hull() -> void:
+	var inertia := _setup.body_inertia()
+	var hull_only := _setup.mass / 12.0 * (
+		_setup.body_size.x * _setup.body_size.x + _setup.body_size.y * _setup.body_size.y
+	)
+	assert_gt(_setup.track_width, _setup.body_size.x, "the wheels stand outside the hull")
+	assert_gt(inertia.z, hull_only * 1.5)
+	assert_almost_eq(
+		inertia.z,
+		_setup.mass / 12.0 * (
+			_setup.track_width * _setup.track_width + _setup.body_size.y * _setup.body_size.y
+		),
+		0.001
+	)
+
+
+func test_roll_is_the_lightest_axis_and_yaw_the_heaviest() -> void:
+	var inertia := _setup.body_inertia()
+	assert_lt(inertia.z, inertia.x)
+	assert_lt(inertia.x, inertia.y)
+
+
+func test_the_dampers_and_tyres_cannot_overdrive_the_roll_axis_in_one_tick() -> void:
+	var tick := 1.0 / 120.0
+	var half_track := _setup.track_width * 0.5
+	var damping := 4.0 * _setup.suspension_damping_rebound * half_track * half_track
+	var stiffness := 4.0 * _setup.suspension_stiffness * half_track * half_track
+	var roll_inertia := _setup.body_inertia().z
+	assert_lt(
+		2.0 * damping * tick / roll_inertia + stiffness * tick * tick / roll_inertia, 4.0 * 0.6,
+		"the suspension alone must leave most of the stability margin for the tyres"
+	)

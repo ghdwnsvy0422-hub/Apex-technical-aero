@@ -103,6 +103,15 @@ func driven_wheel_inertia(total_gear_ratio: float, driven_count: int) -> float:
 
 ## The chassis origin sits at the suspension mounts, so the contact plane is a
 ## full uncompressed ray length below it.
+func body_inertia() -> Vector3:
+	var twelfth := mass / 12.0
+	return Vector3(
+		twelfth * (body_size.y * body_size.y + body_size.z * body_size.z),
+		twelfth * (body_size.x * body_size.x + body_size.z * body_size.z),
+		twelfth * (track_width * track_width + body_size.y * body_size.y)
+	)
+
+
 func contact_depth() -> float:
 	return suspension_rest_length + wheel_radius
 

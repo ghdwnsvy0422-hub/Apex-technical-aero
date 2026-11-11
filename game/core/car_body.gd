@@ -73,6 +73,7 @@ func _configure_body() -> void:
 	mass = setup.mass
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = setup.center_of_mass_offset()
+	inertia = setup.body_inertia()
 	# A race car is never idle long enough to be worth sleeping, and a sleeping
 	# body would stop reporting state to the server.
 	can_sleep = false
@@ -241,18 +242,28 @@ func _simulate_wheel(
 	var limit := TyreModel.grip_limit(
 		load, setup.tyre_friction * wheel.surface_friction, setup.load_sensitivity
 	)
-	wheel.longitudinal_force = coefficients.x * limit
-	wheel.lateral_force = coefficients.y * limit
+	wheel.lateral_force = TyreModel.arrested(
+		coefficients.y * limit, lateral_speed, setup.corner_mass() * TyreModel.LOW_SPEED_ARREST_SHARE, delta
+	)
+
+	var slip_speed := wheel.surface_speed(setup.wheel_radius) - longitudinal_speed
+	var stale_force := coefficients.x * limit
+	var rolling := setup.rolling_resistance * load * setup.wheel_radius
+	var wheel_drive := drive_torque if wheel.is_driven else 0.0
+	wheel.integrate_spin(
+		wheel_drive, braking + rolling, stale_force, inertia, setup, delta,
+		TyreModel.slip_stiffness(stale_force, slip_speed)
+	)
+	wheel.longitudinal_force = TyreModel.force_after_spin(
+		stale_force,
+		slip_speed,
+		wheel.surface_speed(setup.wheel_radius) - longitudinal_speed,
+		limit * sqrt(maxf(1.0 - coefficients.y * coefficients.y, 0.0))
+	)
 
 	apply_force(
 		ground_forward * wheel.longitudinal_force + ground_right * wheel.lateral_force,
 		wheel.contact_point - global_position
-	)
-
-	var rolling := setup.rolling_resistance * load * setup.wheel_radius
-	var wheel_drive := drive_torque if wheel.is_driven else 0.0
-	wheel.integrate_spin(
-		wheel_drive, braking + rolling, wheel.longitudinal_force, inertia, setup, delta
 	)
 
 

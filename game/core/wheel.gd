@@ -57,17 +57,20 @@ func surface_speed(wheel_radius: float) -> float:
 ## spinning wheel back down to road speed.
 func integrate_spin(
 	drive_torque: float, braking_torque: float, tyre_force: float,
-	inertia: float, setup: CarSetup, delta: float
+	inertia: float, setup: CarSetup, delta: float, slip_stiffness: float = 0.0
 ) -> void:
 	if inertia <= 0.0:
 		return
 
+	var resisted_inertia := (
+		inertia + maxf(slip_stiffness, 0.0) * setup.wheel_radius * setup.wheel_radius * delta
+	)
 	var reaction := -tyre_force * setup.wheel_radius
-	angular_velocity += (drive_torque + reaction) / inertia * delta
+	angular_velocity += (drive_torque + reaction) / resisted_inertia * delta
 
 	# Brakes may bring a wheel to rest but must never drive it backwards,
 	# which is what an unclamped torque would do in a single large step.
-	var brake_delta := braking_torque / inertia * delta
+	var brake_delta := braking_torque / resisted_inertia * delta
 	if absf(angular_velocity) <= brake_delta:
 		angular_velocity = 0.0
 	else:

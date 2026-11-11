@@ -93,3 +93,47 @@ func test_slip_ratio_stays_finite_at_a_standstill() -> void:
 func test_slip_angle_opposes_the_direction_of_slide() -> void:
 	assert_lt(TyreModel.slip_angle(5.0, 50.0), 0.0)
 	assert_gt(TyreModel.slip_angle(-5.0, 50.0), 0.0)
+
+
+func test_slip_stiffness_is_force_per_unit_of_slip_speed() -> void:
+	assert_almost_eq(TyreModel.slip_stiffness(3000.0, 0.5), 6000.0, 0.001)
+	assert_almost_eq(TyreModel.slip_stiffness(-3000.0, -0.5), 6000.0, 0.001)
+
+
+func test_slip_stiffness_is_never_negative_or_infinite() -> void:
+	assert_eq(TyreModel.slip_stiffness(3000.0, -0.5), 0.0)
+	assert_eq(TyreModel.slip_stiffness(3000.0, 0.0), 0.0)
+	assert_eq(TyreModel.slip_stiffness(3000.0, TyreModel.MIN_SLIP_SPEED * 0.5), 0.0)
+
+
+func test_the_force_follows_the_slip_the_wheel_ended_the_tick_with() -> void:
+	assert_almost_eq(TyreModel.force_after_spin(2000.0, 1.0, 0.25, 9000.0), 500.0, 0.001)
+	assert_almost_eq(TyreModel.force_after_spin(-2000.0, -1.0, -0.5, 9000.0), -1000.0, 0.001)
+
+
+func test_the_force_after_spin_stays_inside_what_the_tyre_has_left() -> void:
+	assert_eq(TyreModel.force_after_spin(2000.0, 0.1, 5.0, 3500.0), 3500.0)
+	assert_eq(TyreModel.force_after_spin(-2000.0, -0.1, -5.0, 3500.0), -3500.0)
+
+
+func test_a_wheel_that_was_not_slipping_keeps_its_force() -> void:
+	assert_eq(TyreModel.force_after_spin(40.0, 0.0, 0.3, 3500.0), 40.0)
+
+
+func test_a_slow_slide_cannot_be_stopped_harder_than_it_is_moving() -> void:
+	var tick := 1.0 / 120.0
+	var capped := TyreModel.arrested(3000.0, 0.01, 100.0, tick)
+	assert_almost_eq(capped, 100.0 * 0.01 / tick, 0.001)
+	assert_almost_eq(TyreModel.arrested(-3000.0, -0.01, 100.0, tick), -capped, 0.001)
+
+
+func test_a_real_slide_keeps_its_full_cornering_force() -> void:
+	assert_eq(TyreModel.arrested(3000.0, 2.0, 100.0, 1.0 / 120.0), 3000.0)
+
+
+func test_a_tyre_that_is_not_sliding_gives_no_side_force() -> void:
+	assert_eq(TyreModel.arrested(3000.0, 0.0, 100.0, 1.0 / 120.0), 0.0)
+
+
+func test_arresting_needs_a_time_step() -> void:
+	assert_eq(TyreModel.arrested(3000.0, 0.01, 100.0, 0.0), 3000.0)

@@ -21,9 +21,11 @@ var _failures: PackedStringArray = []
 
 func _ready() -> void:
 	await _probe_settling()
+	await _probe_low_speed_stillness()
 	await _probe_acceleration()
 	await _probe_braking()
 	await _probe_cornering()
+	await _probe_cornering_symmetry()
 	await _probe_downforce_tradeoff()
 	await _probe_track_surfaces()
 	await _probe_compiled_track()
@@ -57,6 +59,48 @@ func _probe_settling() -> void:
 	)
 
 	_despawn(harness)
+
+
+func _probe_low_speed_stillness() -> void:
+	var harness := _spawn()
+	await harness.coast(2 * TICK_RATE)
+
+	var parked: Vector3 = await _measure_chatter(harness, DriverInput.new())
+	Log.info(TAG, "parked: side-to-side load %.0f N | creep %.3f m/s | slip reversals %.0f/s" % [
+		parked.x, parked.y, parked.z
+	])
+	_check(parked.x < 50.0, "a parked car keeps its weight on both sides (%.0f N apart)" % parked.x)
+	_check(parked.y < 0.01, "a parked car does not creep (%.3f m/s)" % parked.y)
+
+	await harness.drive(DriverInput.create(0.25, 0.0, 0.0), 2 * TICK_RATE)
+	var rolling: Vector3 = await _measure_chatter(harness, DriverInput.create(0.25, 0.0, 0.0))
+	Log.info(TAG, "rolling at %.0f km/h: side-to-side load %.0f N | slip reversals %.0f/s" % [
+		harness.car.speed_kph(), rolling.x, rolling.z
+	])
+	_check(rolling.x < 50.0, "a slow car keeps its weight on both sides (%.0f N apart)" % rolling.x)
+	_check(rolling.z < 10.0, "a rolling wheel does not flip between spin and drag (%.0f/s)" % rolling.z)
+
+	_despawn(harness)
+
+
+func _measure_chatter(harness: DriveHarness, input: DriverInput) -> Vector3:
+	harness.car.input = input
+	var load_gap := 0.0
+	var fastest := 0.0
+	var reversals := 0
+	var last_sign := 0.0
+	for _tick: int in TICK_RATE:
+		await get_tree().physics_frame
+		var wheels := harness.car.wheels
+		load_gap = maxf(load_gap, absf(wheels[0].load - wheels[1].load))
+		load_gap = maxf(load_gap, absf(wheels[2].load - wheels[3].load))
+		fastest = maxf(fastest, harness.car.linear_velocity.length())
+		var slip_sign := signf(wheels[0].slip_ratio)
+		if slip_sign != 0.0 and slip_sign != last_sign:
+			if last_sign != 0.0:
+				reversals += 1
+			last_sign = slip_sign
+	return Vector3(load_gap, fastest, float(reversals))
 
 
 func _probe_acceleration() -> void:
@@ -149,6 +193,39 @@ func _probe_cornering() -> void:
 	_check(upright > 0.7, "car stays upright through the corner")
 
 	_despawn(harness)
+
+
+func _probe_cornering_symmetry() -> void:
+	var right: Vector2 = await _cornering_response(1.0)
+	var left: Vector2 = await _cornering_response(-1.0)
+	Log.info(TAG, "cornering symmetry: right %.1f deg %+.1f m | left %.1f deg %+.1f m" % [
+		right.x, right.y, left.x, left.y
+	])
+
+	_check(left.y < -1.0, "steering left sends the car left (%+.1f m)" % left.y)
+	_check(
+		absf(right.x - left.x) < 1.0,
+		"the car turns as far left as right (%.1f vs %.1f deg)" % [left.x, right.x]
+	)
+	_check(
+		absf(right.y + left.y) < 1.0,
+		"the car drifts as far left as right (%+.1f vs %+.1f m)" % [left.y, right.y]
+	)
+
+
+func _cornering_response(steer: float) -> Vector2:
+	var harness := _spawn()
+	await harness.coast(TICK_RATE)
+	await harness.drive(DriverInput.create(1.0, 0.0, 0.0), 3 * TICK_RATE)
+
+	var start_heading := _heading(harness.car)
+	var start_x := harness.car.global_position.x
+	await harness.drive(DriverInput.create(0.45, 0.0, steer), 4 * TICK_RATE)
+	var turned := absf(rad_to_deg(angle_difference(start_heading, _heading(harness.car))))
+	var drift := harness.car.global_position.x - start_x
+
+	_despawn(harness)
+	return Vector2(turned, drift)
 
 
 ## PRD 27: wing area bought for cornering must be paid for on the straights.
