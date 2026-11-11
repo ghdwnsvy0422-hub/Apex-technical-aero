@@ -198,3 +198,61 @@ func test_a_slide_does_not_stop_the_driver_braking() -> void:
 
 	assert_gt(sliding.brake, 0.0)
 	assert_eq(sliding.throttle, 0.0)
+
+
+func test_a_plan_that_is_gaining_speed_gets_more_throttle() -> void:
+	var holding := AiDriver.throttle_for(60.0, 61.0)
+	var gaining := AiDriver.throttle_for(60.0, 61.0, 0.5)
+	assert_lt(holding, 0.5, "one metre per second short is only a nudge")
+	assert_eq(gaining, 1.0, "but a plan that is accelerating wants the car flat out")
+
+
+func test_a_plan_that_is_slowing_does_not_take_throttle_away() -> void:
+	assert_eq(AiDriver.throttle_for(60.0, 62.0, -4.0), AiDriver.throttle_for(60.0, 62.0))
+
+
+func test_a_gaining_plan_does_not_push_a_car_past_its_target() -> void:
+	assert_eq(AiDriver.throttle_for(60.0, 60.0, 3.0), 0.0)
+
+
+func test_the_launch_limit_still_holds_when_the_plan_is_gaining() -> void:
+	assert_lt(AiDriver.throttle_for(0.0, 90.0, 5.0), 0.5)
+
+
+func test_cornering_tyres_cap_the_throttle() -> void:
+	assert_eq(AiDriver.cornering_throttle_limit(1.0), 1.0)
+	assert_eq(AiDriver.cornering_throttle_limit(0.0), AiDriver.CORNERING_THROTTLE)
+	assert_between(AiDriver.cornering_throttle_limit(0.5), AiDriver.CORNERING_THROTTLE, 1.0)
+	assert_eq(AiDriver.cornering_throttle_limit(-2.0), AiDriver.CORNERING_THROTTLE)
+	assert_eq(AiDriver.cornering_throttle_limit(3.0), 1.0)
+
+
+func test_the_driver_holds_back_at_the_apex_but_not_on_the_straight() -> void:
+	var apex_frame := TrackGeometry.frame_at(_curve, 944.0, _line.centreline_length_m)
+	var apex_speed := _line.speed_for_offset(944.0) * 0.6
+	var at_apex := _driver.input_for(apex_frame, apex_frame.basis * Vector3.FORWARD * apex_speed)
+
+	var straight_frame := TrackGeometry.frame_at(_curve, 300.0, _line.centreline_length_m)
+	var straight_speed := _line.speed_for_offset(300.0) * 0.6
+	var on_straight := _driver.input_for(
+		straight_frame, straight_frame.basis * Vector3.FORWARD * straight_speed
+	)
+
+	assert_eq(on_straight.throttle, 1.0)
+	assert_gt(at_apex.throttle, 0.0)
+	assert_lt(at_apex.throttle, 1.0, "the tyres are still turning the car")
+
+
+func test_the_driver_looks_less_far_ahead_to_brake_than_to_accelerate() -> void:
+	assert_lt(AiDriver.BRAKE_PREVIEW_SECONDS, AiDriver.SPEED_PREVIEW_SECONDS)
+
+
+func test_braking_always_wins_over_the_throttle() -> void:
+	var offset := 0.0
+	while offset < _line.centreline_length_m:
+		var frame := TrackGeometry.frame_at(_curve, offset, _line.centreline_length_m)
+		for scale: float in [0.7, 1.0, 1.15]:
+			var speed := _line.speed_for_offset(offset) * scale
+			var input := _driver.input_for(frame, frame.basis * Vector3.FORWARD * speed)
+			assert_eq(input.throttle * input.brake, 0.0, "at %.0f m, %.0f%% pace" % [offset, scale * 100.0])
+		offset += 40.0

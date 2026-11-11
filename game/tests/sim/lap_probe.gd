@@ -6,7 +6,7 @@ const TRACK_ID: String = "aurora_speedway"
 const TARGET_LAPS: int = 2
 const TIMEOUT_S: int = 400
 
-const BASELINE_LAP_S: float = 64.467
+const BASELINE_LAP_S: float = 61.517
 const LAP_TOLERANCE_S: float = 0.5
 const MIN_FLYING_KPH: float = 30.0
 
@@ -17,7 +17,9 @@ var _run: LapRunner
 
 
 func _ready() -> void:
-	if not _build_world():
+	var envelope: PerformanceEnvelope = await PerformanceEnvelope.measure(self, CarSetup.new())
+	Log.info(TAG, "envelope: %s" % envelope.describe())
+	if not _build_world(envelope):
 		_report()
 		return
 	_run = await LapRunner.run(
@@ -31,7 +33,7 @@ func _sector_count() -> int:
 	return int(DataRegistry.get_track(TRACK_ID).get("sector_count", 3))
 
 
-func _build_world() -> bool:
+func _build_world(envelope: PerformanceEnvelope) -> bool:
 	var source := DataRegistry.get_track(TRACK_ID)
 	if source.is_empty():
 		_check(false, "track '%s' is missing" % TRACK_ID)
@@ -48,6 +50,7 @@ func _build_world() -> bool:
 	if _line.points.is_empty():
 		_check(false, "racing line is empty")
 		return false
+	envelope.apply_to(_line)
 
 	Log.info(TAG, "%s: %.0f m, ideal lap %s" % [
 		TRACK_ID, _track.length(), LapTimer.format_time(_line.estimated_lap_seconds())

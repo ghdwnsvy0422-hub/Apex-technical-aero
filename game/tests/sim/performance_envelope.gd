@@ -10,6 +10,8 @@ const LAUNCH_RAMP_S: float = 2.5
 
 const ACCELERATION_FROM_KPH: float = 100.0
 const ACCELERATION_TO_KPH: float = 200.0
+const ACCELERATION_BAND_KPH: float = 20.0
+const ACCELERATION_PLATEAU_MARGIN_KPH: float = 5.0
 const BRAKING_ENTRY_S: int = 8
 const BRAKING_FLOOR: float = 0.25
 const SKIDPAD_ENTRY_KPH: float = 180.0
@@ -20,19 +22,25 @@ var top_speed_kph: float = 0.0
 var lateral_g: float = 0.0
 var braking_g: float = 0.0
 var acceleration_g: float = 0.0
+var acceleration_by_speed: PackedVector2Array = PackedVector2Array()
 
 
 static func measure(host: Node, setup: CarSetup) -> PerformanceEnvelope:
 	var envelope := PerformanceEnvelope.new()
 	envelope.top_speed_kph = await _measure_top_speed(host, setup)
 	envelope.acceleration_g = await _measure_acceleration(host, setup)
+	envelope.acceleration_by_speed = await _measure_acceleration_by_speed(
+		host, setup, envelope.top_speed_kph
+	)
 	envelope.braking_g = await _measure_braking(host, setup)
 	envelope.lateral_g = await _measure_lateral(host, setup)
 	return envelope
 
 
 func apply_to(line: RacingLine) -> void:
-	line.compute_speeds(lateral_g, braking_g, acceleration_g, top_speed_kph)
+	line.compute_speeds(
+		lateral_g, braking_g, acceleration_g, top_speed_kph, acceleration_by_speed
+	)
 
 
 func describe() -> String:
@@ -89,6 +97,56 @@ static func _measure_acceleration(host: Node, setup: CarSetup) -> float:
 
 	var gained := (ACCELERATION_TO_KPH - ACCELERATION_FROM_KPH) / 3.6
 	return gained / (left_at - entered_at) / GRAVITY
+
+
+static func band_count_below(top_speed_kph: float) -> int:
+	return maxi(
+		int(floor((top_speed_kph - ACCELERATION_PLATEAU_MARGIN_KPH) / ACCELERATION_BAND_KPH)), 0
+	)
+
+
+static func acceleration_curve(
+	crossing_times_s: PackedFloat32Array, top_speed_kph: float
+) -> PackedVector2Array:
+	var curve := PackedVector2Array()
+	var band := ACCELERATION_BAND_KPH / 3.6
+	var entered_at := 0.0
+	for index: int in crossing_times_s.size():
+		var elapsed := crossing_times_s[index] - entered_at
+		entered_at = crossing_times_s[index]
+		if elapsed <= 0.0:
+			continue
+		curve.append(Vector2((float(index) + 0.5) * band, band / elapsed / GRAVITY))
+	if curve.is_empty():
+		return curve
+	curve.append(Vector2(maxf(top_speed_kph / 3.6, curve[curve.size() - 1].x + 0.1), 0.0))
+	return curve
+
+
+static func _measure_acceleration_by_speed(
+	host: Node, setup: CarSetup, top_speed_kph: float
+) -> PackedVector2Array:
+	var bands := band_count_below(top_speed_kph)
+	if bands == 0:
+		return PackedVector2Array()
+
+	var harness := _spawn(host, setup)
+	await harness.coast(TICK_RATE)
+
+	var crossings := PackedFloat32Array()
+	for tick: int in PLATEAU_TIMEOUT_S * TICK_RATE:
+		var elapsed := float(tick) / TICK_RATE
+		harness.car.input = DriverInput.create(launch_throttle(elapsed), 0.0, 0.0)
+		await host.get_tree().physics_frame
+
+		var next_threshold := float(crossings.size() + 1) * ACCELERATION_BAND_KPH
+		if harness.car.speed_kph() >= next_threshold:
+			crossings.append(float(tick + 1) / TICK_RATE)
+		if crossings.size() >= bands:
+			break
+
+	_despawn(host, harness)
+	return acceleration_curve(crossings, top_speed_kph)
 
 
 static func _measure_braking(host: Node, setup: CarSetup) -> float:

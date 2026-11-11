@@ -86,3 +86,55 @@ func test_the_description_reports_every_measured_axis() -> void:
 	assert_string_contains(text, "2.41")
 	assert_string_contains(text, "2.11")
 	assert_string_contains(text, "0.93")
+
+
+func test_bands_stop_short_of_the_top_speed_plateau() -> void:
+	assert_eq(PerformanceEnvelope.band_count_below(310.0), 15)
+	assert_eq(PerformanceEnvelope.band_count_below(280.0), 13,
+		"the last few km/h take too long to reach to be worth timing")
+	assert_eq(PerformanceEnvelope.band_count_below(3.0), 0)
+
+
+func test_steady_acceleration_times_into_a_flat_curve() -> void:
+	var band := PerformanceEnvelope.ACCELERATION_BAND_KPH / 3.6
+	var one_g_band_s := band / PerformanceEnvelope.GRAVITY
+	var crossings := PackedFloat32Array([one_g_band_s, one_g_band_s * 2.0, one_g_band_s * 3.0])
+
+	var curve := PerformanceEnvelope.acceleration_curve(crossings, 200.0)
+
+	assert_eq(curve.size(), 4)
+	for index: int in 3:
+		assert_almost_eq(curve[index].y, 1.0, 0.001)
+		assert_almost_eq(curve[index].x, (float(index) + 0.5) * band, 0.001,
+			"each figure belongs to the middle of its band")
+
+
+func test_the_curve_ends_with_nothing_left_at_top_speed() -> void:
+	var curve := PerformanceEnvelope.acceleration_curve(PackedFloat32Array([0.5, 1.2]), 200.0)
+	var last := curve[curve.size() - 1]
+	assert_almost_eq(last.x, 200.0 / 3.6, 0.001)
+	assert_eq(last.y, 0.0)
+
+
+func test_a_slower_band_reads_as_less_acceleration() -> void:
+	var curve := PerformanceEnvelope.acceleration_curve(PackedFloat32Array([0.5, 1.5]), 200.0)
+	assert_lt(curve[1].y, curve[0].y)
+
+
+func test_no_crossings_give_no_curve() -> void:
+	assert_eq(PerformanceEnvelope.acceleration_curve(PackedFloat32Array(), 200.0).size(), 0)
+
+
+func test_the_measured_curve_reaches_the_speed_profile() -> void:
+	var flat := fresh_line()
+	envelope(310.0, 2.4, 2.1, 0.9).apply_to(flat)
+
+	var fading := envelope(310.0, 2.4, 2.1, 0.9)
+	fading.acceleration_by_speed = PackedVector2Array([
+		Vector2(20.0, 0.9), Vector2(60.0, 0.5), Vector2(86.0, 0.0)
+	])
+	var line := fresh_line()
+	fading.apply_to(line)
+
+	assert_gt(line.estimated_lap_seconds(), flat.estimated_lap_seconds(),
+		"a sweep that ignores the curve asks for speed the car cannot reach")

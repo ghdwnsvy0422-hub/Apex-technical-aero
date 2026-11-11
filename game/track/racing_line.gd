@@ -6,16 +6,17 @@ const DEFAULT_EDGE_MARGIN_M: float = 1.2
 const RELAXATION: float = 0.4
 const SMOOTHING_PASSES: int = 300
 
-const DEFAULT_LATERAL_G: float = 2.2
-const DEFAULT_BRAKING_G: float = 2.0
+const DEFAULT_LATERAL_G: float = 2.4
+const DEFAULT_BRAKING_G: float = 2.1
 const DEFAULT_ACCELERATION_G: float = 0.55
-const DEFAULT_TOP_SPEED_KPH: float = 350.0
+const DEFAULT_TOP_SPEED_KPH: float = 310.0
 const GRAVITY: float = 9.8
 
 var points: Array[Vector3] = []
 var lateral_m: PackedFloat32Array = PackedFloat32Array()
 var curvature: PackedFloat32Array = PackedFloat32Array()
 var speed_mps: PackedFloat32Array = PackedFloat32Array()
+var drive_share: PackedFloat32Array = PackedFloat32Array()
 var corridor_m: float = 0.0
 var sample_spacing_m: float = 0.0
 var centreline_length_m: float = 0.0
@@ -49,33 +50,45 @@ func compute_speeds(
 	lateral_g: float = DEFAULT_LATERAL_G,
 	braking_g: float = DEFAULT_BRAKING_G,
 	acceleration_g: float = DEFAULT_ACCELERATION_G,
-	top_speed_kph: float = DEFAULT_TOP_SPEED_KPH
+	top_speed_kph: float = DEFAULT_TOP_SPEED_KPH,
+	acceleration_by_speed: PackedVector2Array = PackedVector2Array()
 ) -> void:
 	var count := points.size()
 	speed_mps.resize(count)
+	drive_share.resize(count)
 	if count < 3:
 		return
 
+	var lateral_limit := lateral_g * GRAVITY
 	var top_speed := top_speed_kph / 3.6
 	for index: int in count:
 		var bend := curvature[index]
 		if bend < 0.000001:
 			speed_mps[index] = top_speed
 		else:
-			speed_mps[index] = minf(top_speed, sqrt(lateral_g * GRAVITY / bend))
+			speed_mps[index] = minf(top_speed, sqrt(lateral_limit / bend))
 
 	for _lap: int in 2:
 		for index: int in count:
 			var ahead := posmod(index + 1, count)
 			var step := points[index].distance_to(points[ahead])
+			var engine_g := acceleration_at(speed_mps[index], acceleration_g, acceleration_by_speed)
+			var tyre_g := lateral_g * grip_left(speed_mps[index], curvature[index], lateral_limit)
+			var available_g := minf(engine_g, tyre_g)
 			speed_mps[ahead] = minf(
-				speed_mps[ahead], _reachable(speed_mps[index], acceleration_g, step)
+				speed_mps[ahead], _reachable(speed_mps[index], available_g, step)
 			)
 		for reverse: int in count:
 			var index := count - 1 - reverse
 			var ahead := posmod(index + 1, count)
 			var step := points[index].distance_to(points[ahead])
-			speed_mps[index] = minf(speed_mps[index], _reachable(speed_mps[ahead], braking_g, step))
+			var slowing_g := braking_g * grip_left(speed_mps[ahead], curvature[ahead], lateral_limit)
+			speed_mps[index] = minf(speed_mps[index], _reachable(speed_mps[ahead], slowing_g, step))
+
+	for index: int in count:
+		var engine_g := acceleration_at(speed_mps[index], acceleration_g, acceleration_by_speed)
+		var tyre_g := lateral_g * grip_left(speed_mps[index], curvature[index], lateral_limit)
+		drive_share[index] = 1.0 if engine_g <= 0.0 else clampf(tyre_g / engine_g, 0.0, 1.0)
 
 
 func index_for_offset(centreline_offset_m: float) -> int:
@@ -88,6 +101,12 @@ func point_for_offset(centreline_offset_m: float) -> Vector3:
 	if points.is_empty():
 		return Vector3.ZERO
 	return points[index_for_offset(centreline_offset_m)]
+
+
+func drive_share_for_offset(centreline_offset_m: float) -> float:
+	if drive_share.is_empty():
+		return 1.0
+	return drive_share[index_for_offset(centreline_offset_m)]
 
 
 func speed_for_offset(centreline_offset_m: float) -> float:
@@ -117,6 +136,29 @@ func estimated_lap_seconds() -> float:
 		var step := points[index].distance_to(points[posmod(index + 1, points.size())])
 		total += step / maxf(speed_mps[index], 1.0)
 	return total
+
+
+static func grip_left(speed: float, bend: float, lateral_limit: float) -> float:
+	if lateral_limit <= 0.0:
+		return 0.0
+	var used := speed * speed * bend / lateral_limit
+	return sqrt(maxf(1.0 - used * used, 0.0))
+
+
+static func acceleration_at(
+	speed: float, fallback_g: float, by_speed: PackedVector2Array
+) -> float:
+	if by_speed.is_empty():
+		return fallback_g
+	if speed <= by_speed[0].x:
+		return by_speed[0].y
+	for index: int in range(1, by_speed.size()):
+		var upper := by_speed[index]
+		if speed > upper.x:
+			continue
+		var lower := by_speed[index - 1]
+		return lerpf(lower.y, upper.y, inverse_lerp(lower.x, upper.x, speed))
+	return by_speed[by_speed.size() - 1].y
 
 
 static func menger_curvature(first: Vector3, second: Vector3, third: Vector3) -> float:
