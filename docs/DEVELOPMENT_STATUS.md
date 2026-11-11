@@ -46,7 +46,7 @@
 
 | 작업 | 상태 | 근거 / 비고 |
 |---|---|---|
-| Stage 0.1 프로젝트 골격 | 완료 | `game/project.godot`, 폴더 구조, `.gitignore`, `CLAUDE.md`. 헤드리스 부팅 확인. 세부 감사는 `STAGE_0_1_PROMPT` 미실행 |
+| Stage 0.1 프로젝트 골격 | 완료 | 2026-11-11 `STAGE_0_1_PROMPT` 감사 수행. 체크리스트 A~E 전 항목 일치, 갭 없음, 코드 변경 없음. 결과는 §13 |
 | Stage 0.2 검증 게이트(GUT + CI) | 완료 | `tools/check.sh` 통과. CI 워크플로(`.github/workflows/ci.yml`)는 `push: main`과 `pull_request`에서만 돈다. 실행 결과는 R8 참조 |
 | Stage 0.3 데이터 스키마 + 검증 로더 | 완료 | `DataRegistry` 부팅 검증 통과, `test_data_registry.gd` 통과 |
 | Phase 1.1 차량 물리 코어 | 완료(자동 검증 범위) | `RigidBody3D` + 레이캐스트 서스펜션 + 슬립 기반 타이어. 프로브 통과. 조종감은 미판정 |
@@ -208,6 +208,7 @@ PRD에 있으나 제작 계획에 대응 작업이 없는 것: §36 역주행 �
 | 일자 | 내용 |
 |---|---|
 | 2026-11-11 | 최초 작성. `origin/main` `7b3d7bf` 기준으로 저장소를 조사하고 `check.sh`를 실행해 기록함 |
+| 2026-11-11 | `STAGE_0_1_PROMPT` 실행: 체크리스트 A~E 전 항목 일치, 갭 없음, 코드 변경 없음(§13) |
 | 2026-11-11 | `MASTER_PROMPT` 실행: §10 요구사항 추적 작성, §12 구조와 의존성 추가, §6에 B5~B8, §7에 R10~R13 추가, §8 실행 계획 수립. 기준선 `check.sh`(173 테스트, 프로브 28, 랩 1:04.467)와 `sweep.sh`(§6.17 표와 일치)를 실행함 |
 
 ## 12. 구조와 의존성 (2026-11-11 조사)
@@ -219,3 +220,47 @@ PRD에 있으나 제작 계획에 대응 작업이 없는 것: §36 역주행 �
 - 데이터와 검증기의 짝: `parts.json`↔`validate_parts`, `tiers.json`↔`validate_tiers`, `tyre_compounds.json`↔`validate_compounds`, `tracks/*.json`↔`validate_track`. 빠진 짝 없음.
 - 선행 조건: Phase 1 게이트(사람) → 2.1 → 2.2/2.4/2.5 → 2.3 → 2.6/2.7. 3.1 → 3.2 → 3.3/3.4 → 3.9, 3.9는 6.1(트랙 추가) 없이는 Phase 3 게이트("트랙 A 최적이 트랙 B에서 느림")를 판정할 수 없다. 4.5는 R6 해결이 선행. 5.x는 2.x 완료가 선행.
 - 백엔드: 현재 단계에서 불필요함을 확인. `backend/`는 `.gitkeep`뿐이고 도입 시점은 Phase 5.1, 선행 조건은 Phase 2~4 게이트다.
+
+## 13. Stage 0.1 감사 결과 (2026-11-11)
+
+`docs/prompts/STAGE_0_1_PROMPT.md` 체크리스트. 판정은 `일치` / `불일치` / `미확인`. **갭 없음. 코드와 설정을 수정하지 않았다.**
+
+| 항목 | 확인 방법 | 결과 |
+|---|---|---|
+| A. 엔진 버전 4.4 | `./tools/godot.sh --version` → `4.4.stable.official.4c311cbee`, `config/features=("4.4", "Forward Plus")` | 일치 |
+| A. 렌더러 | `rendering/renderer/rendering_method="forward_plus"` | 일치 |
+| A. 물리 엔진 | `3d/physics_engine="Jolt Physics"`, `--selfcheck` 통과, 부팅 로그 `Jolt Physics` | 일치 |
+| A. 물리 틱 | `common/physics_ticks_per_second=120`, `--selfcheck` 통과 | 일치 |
+| A. 정적 타입 경고 | `[debug]`의 `untyped_declaration=1`, `unsafe_property_access=1`, `unsafe_method_access=1`, `unsafe_cast=1` | 일치(경고 수준. 오류로 승격되어 있지는 않다) |
+| A. 오토로드 | `[autoload]`에 `Log`, `GameConfig`, `DataRegistry`, 세 파일 존재(`game/core/`) | 일치 |
+| A. 입력 액션 10종 | `[input]` 절과 `--selfcheck`의 `required_actions` 검사 통과 | 일치 |
+| A. 메인 씬 | `run/main_scene="res://main.tscn"`, 파일 존재(노드 1개 + `main.gd`) | 일치 |
+| A. 텍스트 전용 | `project.godot`, `main.tscn` 모두 텍스트. `.tres`/바이너리 리소스 없음 | 일치 |
+| B. 폴더 구조 | `ls`: `game/{core,ai,client,net,track,data,ui,server,tests}`, `backend`, `tools`, `docs` 전부 존재 | 일치 |
+| B. 빈 디렉터리 | `game/net`, `game/server`, `backend`에 `.gitkeep`만 있음 | 일치 |
+| B. 문서에 없는 것 | `game/addons/gut`(벤더링된 GUT 9.3.1, `ASSET_CREDITS.md`에 기재), `game/ai`·`game/client`는 `CLAUDE.md`에만 있고 `PRODUCTION_PLAN` A-2에는 없음(B5-4) | 일치(문서 차이만) |
+| C. 무시 대상 | `git check-ignore -v`: `game/.godot/`, `bin/`, `/build/`, `/export/`, `/backend/bin/`, `.env`, `*.local.json`, `export_presets.cfg` 전부 무시됨 | 일치 |
+| C. 무시되어야 할 것이 추적되는지 | `git ls-files \| grep -E '^game/\.godot\|^bin/'` 0건, `git ls-files -ci --exclude-standard` 0건 | 일치 |
+| C. 추적되어야 할 것 | `.uid` 114개 추적, `game/data/*.json`·`game/addons/gut` 무시되지 않음 | 일치 |
+| D. 부팅 분기 | `main.gd`: `selfcheck` 인자 우선 → `DEDICATED_SERVER` / `SIMULATION`(`laptime`, `sweep`, 기본 프로브) / `CLIENT`. `GameConfig.resolve_mode`의 우선순위(`--server` > `--sim` > 빌드 피처 > 클라이언트)와 일치. `test_game_config.gd` 통과 | 일치 |
+| D. 부팅 시 데이터 검증 | `DataRegistry._ready()`가 `reload()`로 4종을 검증. 부팅 로그 `Loaded 12 parts, 7 tiers, 3 compounds, 1 tracks` | 일치 |
+| E. 도구 | `install_godot.sh`(4.4-stable 고정, `bin/godot`), `godot.sh`(`$GODOT` → `bin/godot` → PATH), `check.sh`(임포트/컴파일 → selfcheck → GUT → 프로브 → 랩타임) 모두 `CLAUDE.md` 설명과 같음 | 일치 |
+| E. CI | `.github/workflows/ci.yml`이 `install_godot.sh` 후 `check.sh` 실행. 트리거는 `push: main`, `pull_request` | 일치. 실제 실행 결과는 R8 |
+
+실행 검증(전부 이번 세션에서 실행):
+
+| 명령 | 결과 |
+|---|---|
+| `./tools/install_godot.sh` | 설치됨, `4.4.stable.official.4c311cbee` |
+| `./tools/godot.sh --headless --path game -- --selfcheck` | `Selfcheck passed`, 종료 코드 0 |
+| `./tools/check.sh` | 통과(§2) |
+| `./tools/godot.sh --headless --path game --quit-after 120` | `Client boot` → `Track: Built 4032 m from 1009 cross-sections` → `TestDrive: Ready (autopilot=false)`, 오류 없음 |
+| `timeout 10 ./tools/godot.sh --headless --path game -- --server --port=27015` | `mode=DEDICATED_SERVER`, `Dedicated server boot (port 27015)`. 시간 제한으로 종료(정상). 네트워킹 없음 |
+
+갭이 아니라 제안으로만 남기는 것(수정하지 않음):
+
+- 비어 있지 않은 디렉터리에 `.gitkeep`이 남아 있다: `game/data`, `game/tests`, `game/track`, `game/ui`, `tools`.
+- `export_presets.cfg`가 무시된다. Phase 2.2의 헤드리스 서버 export는 이 파일을 추적해야 재현된다. 2.2 착수 시 `.gitignore`에서 빼야 한다.
+- 데이터 검증 오류는 `--selfcheck`에서만 종료 코드로 이어진다. 클라이언트/서버 모드에서는 `Log.error`만 남기고 부팅을 계속한다. 서버(Phase 2.2)는 잘못된 데이터로 뜨면 안 되므로 그때 결정이 필요하다.
+- CI 잡 이름이 `Selfcheck and unit tests`인데 실제로는 프로브와 랩타임 회귀까지 돈다(표시만의 문제).
+- CI가 PR 없는 작업 브랜치의 푸시에서는 돌지 않는다.
