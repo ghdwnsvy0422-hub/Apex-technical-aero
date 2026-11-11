@@ -6,7 +6,7 @@ const TRACK_ID: String = "aurora_speedway"
 const TARGET_LAPS: int = 2
 const TIMEOUT_S: int = 400
 
-const BASELINE_LAP_S: float = 61.367
+const BASELINE_LAP_S: float = 61.133
 const LAP_TOLERANCE_S: float = 0.5
 const MIN_FLYING_KPH: float = 30.0
 

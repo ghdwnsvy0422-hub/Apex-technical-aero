@@ -73,7 +73,7 @@ var downforce_area: float = 4.00
 ## and wings become free grip, which collapses every track to one setup.
 var induced_drag_factor: float = 0.16
 var air_density: float = 1.225
-var aero_balance: float = 0.45
+var aero_balance: float = 0.43
 
 # --- steering ---
 var max_steer_angle: float = 0.36

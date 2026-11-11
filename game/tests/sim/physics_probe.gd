@@ -15,6 +15,9 @@ const TICK_RATE: int = 120
 const GRAVITY: float = 9.8
 const TAG: String = "Probe"
 const COMPILED_TRACK: String = "aurora_speedway"
+const AERO_BALANCE_MARGIN: float = 0.02
+const EXIT_ENTRY_KPH: float = 150.0
+const STABLE_EXIT_SLIP_DEG: float = 10.0
 
 var _failures: PackedStringArray = []
 
@@ -26,6 +29,7 @@ func _ready() -> void:
 	await _probe_braking()
 	await _probe_cornering()
 	await _probe_cornering_symmetry()
+	await _probe_aero_balance_margin()
 	await _probe_downforce_tradeoff()
 	await _probe_track_surfaces()
 	await _probe_compiled_track()
@@ -211,6 +215,58 @@ func _probe_cornering_symmetry() -> void:
 		absf(right.y + left.y) < 1.0,
 		"the car drifts as far left as right (%+.1f vs %+.1f m)" % [left.y, right.y]
 	)
+
+
+func _probe_aero_balance_margin() -> void:
+	var shipped := CarSetup.new()
+	var nudged := CarSetup.new()
+	nudged.aero_balance = shipped.aero_balance + AERO_BALANCE_MARGIN
+	var shipped_slip: float = await _corner_exit_body_slip(shipped)
+	var nudged_slip: float = await _corner_exit_body_slip(nudged)
+	Log.info(TAG, "corner exit body slip: %.1f deg at aero balance %.2f | %.1f deg at %.2f" % [
+		shipped_slip, shipped.aero_balance, nudged_slip, nudged.aero_balance
+	])
+
+	_check(
+		shipped_slip < STABLE_EXIT_SLIP_DEG,
+		"the car leaves a fast corner pointing where it is going (%.1f deg)" % shipped_slip
+	)
+	_check(
+		nudged_slip < STABLE_EXIT_SLIP_DEG,
+		"%.2f more front aero balance still does not spin it (%.1f deg)" % [
+			AERO_BALANCE_MARGIN, nudged_slip
+		]
+	)
+	_check(
+		shipped.aero_balance + AERO_BALANCE_MARGIN < shipped.front_weight_bias,
+		"the centre of pressure stays behind the centre of mass with margin (%.2f vs %.2f)" % [
+			shipped.aero_balance, shipped.front_weight_bias
+		]
+	)
+
+
+func _corner_exit_body_slip(setup: CarSetup) -> float:
+	var harness := _spawn(setup)
+	await harness.coast(TICK_RATE)
+
+	for tick: int in 30 * TICK_RATE:
+		harness.car.input = DriverInput.create(_launch_throttle(float(tick) / TICK_RATE), 0.0, 0.0)
+		await get_tree().physics_frame
+		if harness.car.speed_kph() >= EXIT_ENTRY_KPH:
+			break
+	await harness.drive(DriverInput.create(0.30, 0.0, 0.30), int(3.5 * TICK_RATE))
+
+	var peak := 0.0
+	for tick: int in int(2.5 * TICK_RATE):
+		var blend := clampf(float(tick) / TICK_RATE, 0.0, 1.0)
+		harness.car.input = DriverInput.create(lerpf(0.30, 1.0, blend), 0.0, lerpf(0.30, 0.0, blend))
+		await get_tree().physics_frame
+		peak = maxf(peak, absf(rad_to_deg(
+			AiDriver.sideslip(harness.car.global_transform, harness.car.linear_velocity)
+		)))
+
+	_despawn(harness)
+	return peak
 
 
 func _cornering_response(steer: float) -> Vector2:
