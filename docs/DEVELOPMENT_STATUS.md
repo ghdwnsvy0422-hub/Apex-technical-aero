@@ -39,7 +39,7 @@
 
 관찰된 경고:
 
-- 물리 프로브 중 `Jolt Physics job system exceeded the maximum number of jobs` 경고가 1회 출력된다. 테스트는 통과했고 원인은 조사하지 않았다. (§6 참조)
+- 물리 프로브 중 `Jolt Physics job system exceeded the maximum number of jobs` 경고가 실행에 따라 0~1회 출력된다. 하네스의 스텝 속도가 원인이고 결과에 영향이 없다(§6 B1, `handoff.md` §6.18).
 - GUT 요약에 `Total orphans = 18`이 출력된다. `handoff.md` §6.13에 따르면 GUT 자체 객체가 섞인 값이며 누수 감시는 `assert_no_new_orphans()`로 한다.
 
 ## 3. 작업 현황 (제작 계획 작업 번호 기준)
@@ -77,7 +77,7 @@
 
 | # | 내용 | 상태 | 비고 |
 |---|---|---|---|
-| B1 | 물리 프로브 실행 중 Jolt 경고 `job system exceeded the maximum number of jobs` | 미확인(원인 미조사) | 테스트는 통과. 프로브가 `--fixed-fps 30`에서 틱을 몰아 돌리는 구성과 관련 있는지 확인 필요. 서버/클라 실제 주행에서도 나오는지 미확인 |
+| B1 | 물리 프로브 실행 중 Jolt 경고 `job system exceeded the maximum number of jobs` | 원인 규명, 수정 안 함 | 하네스가 물리 스텝을 실시간보다 훨씬 빠르게(초당 약 3400스텝) 연달아 돌릴 때만 나온다. 프로브 `--fixed-fps 30` 7/10, `--fixed-fps 120` 8/10, 랩타임 회귀 0/4, 클라이언트 헤드리스 0/5, `--autopilot` 0/3. 결과 수치는 경고 유무와 무관하게 동일. 상세와 고치지 않은 이유는 `handoff.md` §6.18 |
 | B2 | 기존 코드에 주석이 많다. `CLAUDE.md`의 주석 금지 규칙은 `40dc384`에서 추가되었고 이전에 작성된 파일은 그대로다. `game/` 내 `.gd` 46개 중 33개(grep 기준)와 `tools/*.sh` 5개 전부, `tiers.json`/`parts.json`의 `_comment` 필드에서 확인 | 미결 | 일괄 삭제는 범위 밖 변경이므로 하지 않음. 삭제 여부는 사용자 결정 필요 |
 | B3 | `handoff.md` §5가 "같은 GDScript 물리를 돌리므로 서버 권위 판정이 구조적으로 공짜"라고 적고 있다. 동일 코드가 동일 결과를 보장하지 않으므로(`CLAUDE.md` 기술적 제약) 과대 표현이다 | 미결 | `handoff.md`는 이번 문서 작업 범위 밖이라 수정하지 않음 |
 | B5 | 문서 간 불일치(코드 변경 불필요, 문서만 해당). (1) `handoff.md` §2 "이론 랩타임 약 58초" ↔ 같은 문서와 `lap_probe` 출력의 1:01.363. (2) `handoff.md` §7 "모든 작업은 `main`에 커밋/푸시" ↔ `CLAUDE.md` Git 절(브랜치 지정 우선). (3) `handoff.md` §8 디렉터리 목록에 `docs/prompts`, `DEVELOPMENT_STATUS` 없음. (4) `PRODUCTION_PLAN` A-2 구조에 `game/ai`, `game/client` 없음(`CLAUDE.md`에는 있음). (5) `PRODUCTION_PLAN` A-1 "클라/서버 물리 불일치가 구조적으로 발생하지 않는다" ↔ `CLAUDE.md` 기술적 제약(B3과 같은 성격). (6) `PRODUCTION_PLAN` Phase 3 게이트의 "(§7 검증)"은 문맥상 §27. (7) `PRODUCTION_PLAN` 1.5 "체크포인트 통과 판정" ↔ 구현은 센터라인 오프셋 기반(`handoff.md` §6.11에 사유 기재). (8) `PRODUCTION_PLAN` B-1 DSL 예시(`{"straight": 850}`, `drs_zones`) ↔ 실제 형식(`{"kind": "straight", "length_m": 850}`, `pit` 객체). (9) `main.gd` 상단 독스트링 "Stage 0.1 has no gameplay scenes yet"는 낡은 기존 주석 | 미결 | `handoff.md`, `PRODUCTION_PLAN.md`는 수정 금지/승인 대상이라 기록만 함 |
@@ -208,6 +208,7 @@ PRD에 있으나 제작 계획에 대응 작업이 없는 것: §36 역주행 �
 | 일자 | 내용 |
 |---|---|
 | 2026-11-11 | 최초 작성. `origin/main` `7b3d7bf` 기준으로 저장소를 조사하고 `check.sh`를 실행해 기록함 |
+| 2026-11-11 | B1 Jolt 경고 원인 규명(`handoff.md` §6.18). 코드 변경 없음 |
 | 2026-11-11 | `STAGE_0_1_PROMPT` 실행: 체크리스트 A~E 전 항목 일치, 갭 없음, 코드 변경 없음(§13) |
 | 2026-11-11 | `MASTER_PROMPT` 실행: §10 요구사항 추적 작성, §12 구조와 의존성 추가, §6에 B5~B8, §7에 R10~R13 추가, §8 실행 계획 수립. 기준선 `check.sh`(173 테스트, 프로브 28, 랩 1:04.467)와 `sweep.sh`(§6.17 표와 일치)를 실행함 |
 
