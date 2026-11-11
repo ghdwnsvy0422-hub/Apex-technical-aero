@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "_comment": "Track source format (PRODUCTION_PLAN part B-1). Segments are traversed in order from the start line; TrackLayout walks them into a centreline and TrackCompiler turns that into the Curve3D the track mesh is swept along. Corner angle is degrees turned, positive = right. The angles must total 360 degrees and the walk must return to the start line, both of which DataRegistry checks at boot.",
+  "id": "aurora_speedway",
+  "name": "Aurora Speedway",
+  "type": "high_speed",
+  "width_m": 15.0,
+  "race_laps": 8,
+  "sector_count": 3,
+  "segments": [
+    { "kind": "straight", "length_m": 850.0 },
+    { "kind": "corner", "angle_deg": 90.0, "radius_m": 120.0, "banking_deg": 3.0 },
+    { "kind": "straight", "length_m": 300.0 },
+    { "kind": "corner", "angle_deg": 45.0, "radius_m": 260.0, "elevation_m": 8.0 },
+    { "kind": "straight", "length_m": 220.0 },
+    { "kind": "chicane", "length_m": 90.0, "offset_m": 12.0 },
+    { "kind": "straight", "length_m": 354.1 },
+    { "kind": "corner", "angle_deg": 60.0, "radius_m": 150.0 },
+    { "kind": "straight", "length_m": 180.0 },
+    { "kind": "corner", "angle_deg": 45.0, "radius_m": 200.0 },
+    { "kind": "straight", "length_m": 764.4 },
+    { "kind": "corner", "angle_deg": 90.0, "radius_m": 110.0, "elevation_m": -8.0 },
+    { "kind": "straight", "length_m": 240.0 },
+    { "kind": "corner", "angle_deg": 30.0, "radius_m": 300.0 }
+  ],
+  "pit": {
+    "entry_segment": 12,
+    "exit_segment": 2,
+    "lane_speed_kph": 80.0
+  }
+}

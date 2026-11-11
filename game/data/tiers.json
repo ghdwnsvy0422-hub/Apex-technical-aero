@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "_comment": "Visual rank only. Matchmaking uses raw ELO (PRD 8). Each tier runs from its min_elo up to the next tier's min_elo, so bands cannot develop gaps or overlaps. Bands are provisional until Phase 5 data exists (PRD 7).",
+  "tiers": [
+    { "id": "bronze", "name": "Bronze", "min_elo": 0 },
+    { "id": "silver", "name": "Silver", "min_elo": 1000 },
+    { "id": "gold", "name": "Gold", "min_elo": 1200 },
+    { "id": "platinum", "name": "Platinum", "min_elo": 1400 },
+    { "id": "diamond", "name": "Diamond", "min_elo": 1600 },
+    { "id": "master", "name": "Master", "min_elo": 1800 },
+    { "id": "grand_champion", "name": "Grand Champion", "min_elo": 2000 }
+  ]
+}
