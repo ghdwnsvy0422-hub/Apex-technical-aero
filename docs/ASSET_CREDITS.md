@@ -7,7 +7,7 @@
 | 항목 | 버전 | 라이선스 | 출처 | 용도 |
 |---|---|---|---|---|
 | GUT (Godot Unit Test) | 9.3.1 | MIT | https://github.com/bitwes/Gut | 단위 테스트 프레임워크 (`game/addons/gut`) |
-| Claude Code Game Studios | `abc0de7` (2026-11-09) | MIT | https://github.com/Donchitos/Claude-Code-Game-Studios | Claude Code용 에이전트 49개와 스킬 78개(`.claude/`). 에이전트, 스킬, 규칙, 문서, 엔진/장르 참조, 스킬이 호출하는 스크립트만 넣었다. 훅, `settings.json`, 템플릿의 `CLAUDE.md`, `project.yaml`은 넣지 않았다. 게임 빌드에는 포함되지 않는다 |
+| Claude Code Game Studios | `abc0de7` (2026-11-09) | MIT | https://github.com/Donchitos/Claude-Code-Game-Studios | Claude Code용 에이전트 49개와 스킬 78개(`.claude/`). 에이전트, 스킬, 규칙, 문서, 엔진/장르 참조, 스킬이 호출하는 스크립트만 넣었다. 훅(설정 읽기용 `yaml-helper.sh` 하나만 예외), `settings.json`, 템플릿의 `CLAUDE.md`는 넣지 않았다. `project.yaml`은 이 프로젝트에 맞게 새로 썼다. 게임 빌드에는 포함되지 않는다 |
 | Godot Engine | 4.4-stable | MIT | https://godotengine.org | 엔진. 리포에 포함하지 않고 `tools/install_godot.sh`로 설치 |
 
 ## 3D 모델

@@ -248,6 +248,7 @@ PRD에 있으나 제작 계획에 대응 작업이 없는 것: §36 역주행 �
 | 2026-11-11 | Claude Code Game Studios 에이전트/스킬 설치(`9420399`, §14) |
 | 2026-11-11 | B9: 저속 수치 진동 수정(`48e803e`, 차량 물리 변경). 좌우 대칭·저속 정지 프로브 7개 추가. 기준값 61.517 → 61.367 |
 | 2026-11-11 | R14 에어로 밸런스 여유 발견, R15·R16 추가, B8 정정(PR #2 시험 병합), `handoff.md`의 문서 불일치 B5 (1)~(3) 정정 |
+| 2026-11-11 | CCGS 사용 시작: `project.yaml`, `yaml-helper.sh` 추가, `/next-step` → `/reverse-document`로 `design/game-brief.md` 작성(§14) |
 
 ## 12. 구조와 의존성 (2026-11-11 조사)
 
@@ -315,3 +316,11 @@ PRD에 있으나 제작 계획에 대응 작업이 없는 것: §36 역주행 �
 - `project.yaml`이 없으므로 스킬은 기본값(엔진 Web, 코드 루트 `src/`)으로 동작한다. Godot와 `game/` 구조에 맞추려면 `project.yaml`을 추가해야 한다(미결).
 - 스킬 78개 중 60개가 `.claude/scripts`를, 87개 파일이 `project.yaml`을 참조한다. 각 스킬이 이 저장소 구조에서 제대로 동작하는지는 **미확인**이다.
 - 출처는 `docs/ASSET_CREDITS.md`에 기록했다.
+
+2026-11-11 추가(사용자가 CCGS 사용을 지시):
+
+- 스킬이 설정을 읽는 데 쓰는 `.claude/hooks/yaml-helper.sh` 하나를 추가했다. 훅으로 등록되지 않으며(`settings.json` 없음) 자동 실행되지 않는다. 이 파일이 없으면 스킬 69개가 시작 단계에서 실패한다.
+- `project.yaml`을 추가했다: 엔진 Godot 4.4 / GDScript, 코드 루트 `game`, 테스트 루트 `game/tests`. 워크플로는 기본값 `minimal`이다.
+- `/next-step` 실행 결과: 엔진 설정 완료 → 게임 브리프 없음 → `/reverse-document design game`.
+- `/reverse-document` 실행: `design/game-brief.md`를 코드와 PRD에서 작성했다. 요약 문서이며 정본은 여전히 `docs/PRD.md`다. 사용자 검토 전이고, 추론으로 남긴 항목 4개가 문서 끝에 있다.
+- CCGS 경로의 다음 단계는 `/create-stories`(브리프의 미구현 기능마다 스토리 작성)다. 실행하지 않았다. 브리프의 빌드 순서 1번이 사람의 주행 판정(Phase 1 게이트)이고, 나머지 스토리는 전부 Phase 2 이후 작업이기 때문이다.
